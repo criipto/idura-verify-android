@@ -291,4 +291,24 @@ public class BrowserManager(
         customTabIntentLauncher.launch(Pair(request, uri))
       }
     }
+
+  public suspend fun launchBrowser(
+    uri: Uri,
+    state: String,
+  ): Uri {
+    val request =
+      AuthorizationRequest
+        .Builder(
+          AuthorizationServiceConfiguration(
+            "https://example.com".toUri(),
+            "https://example.com".toUri(),
+          ),
+          "clientId",
+          ResponseTypeValues.CODE,
+          redirectUri,
+        ).setState(state)
+        .build()
+
+    return launchBrowser(request, uri)
+  }
 }
