@@ -6,6 +6,10 @@ plugins {
 }
 
 var version = providers.gradleProperty("version").get()
+if (providers.gradleProperty("snapshot").getOrNull() != null) {
+  version += "-SNAPSHOT"
+}
+
 setVersion(version)
 
 android {

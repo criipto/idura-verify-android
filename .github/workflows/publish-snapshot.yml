@@ -1,0 +1,31 @@
+name: Publish SNAPSHOT
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, ref, or SHA to publish from'
+        required: true
+
+jobs:
+  publish:
+    name: Release build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Publish to MavenCentral
+        run: ./gradlew publishToMavenCentral --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_snapshot: true
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_KEY_CONTENTS }}
+          ORG_GRADLE_PROJECT_iduraDomain: ${{ secrets.IDURA_VERIFY_DOMAIN }}
+          ORG_GRADLE_PROJECT_iduraClientId: ${{ secrets.IDURA_VERIFY_CLIENT_ID }}
