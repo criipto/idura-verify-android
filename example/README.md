@@ -1,7 +1,7 @@
 # Example
 This example application shows you how to integrate the Idura Verify Android SDK.
 
-Note that eID which use authenticator apps (Danish MitID, Swedish and Norwegian BanKID) cannot be used in a simulator. So in your to test the full experience, you should have access to a physical Android device.
+Note that eIDs which use authenticator apps (Danish MitID, Swedish and Norwegian BanKID) cannot be used in a simulator. So in order to test the full experience, you should have access to a physical Android device.
 
 1. Clone this repo.
 2. Open the repo in Android Studio.
