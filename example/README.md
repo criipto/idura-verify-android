@@ -7,7 +7,7 @@ Note that eID which use authenticator apps (Danish MitID, Swedish and Norwegian 
 2. Open the repo in Android Studio.
 3. Create a domain in the Idura dashboard, if you haven't done so already.
 4. Create a new Verify application in the Idura dashboard.
-   1. Add `https://[YOUR DOMAIN]/android/callback` and `https://[YOUR DOMAIN]/android/callback/appswitch` as redirect URLs.
+   1. Add `https://[YOUR DOMAIN]/android/callback` as redirect URL.
    2. In the Native / Mobile section, set "App package name" to `eu.idura.verifyexample` (since this application will not be published, you don't need to use your own package name).
    3. Run `./gradlew signingReport` to get the key used to sign your local debug build, and add it to the "SHA256 fingerprints" section.
 5. Add your domain and client ID to the `gradle.properties` file:
