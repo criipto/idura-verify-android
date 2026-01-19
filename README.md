@@ -30,7 +30,7 @@ The SDK needs to be configured with two pieces of information:
 
 The SDK assumes that:
 
-- You will be using your [Idura domain](https://docs.idura.com/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, and \*.idura.id domains can be used).
+- You will be using your [Idura domain](https://docs.idura.com/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
 - Your redirect URL will be `https://[YOUR IDURA DOMAIN]/android/callback`.
 
 You should register the callback URL in the [Idura dashboard](https://dashboard.idura.com). To override these values, see the [Customization section](#customization).
@@ -46,7 +46,7 @@ android {
   }
 
   val iduraClientId = "urn:my:application:identifier:XXXX"
-  val iduraDomain = "this-is-an-example.idura.id"
+  val iduraDomain = "this-is-an-example.idura.broker
 
   defaultConfig {
     manifestPlaceholders["iduraDomain"] = iduraDomain
@@ -92,7 +92,7 @@ During development, you can get the fingerprint of your local signing key by run
 When the SDK is initialized, it will verify that your app is configured to capture the app links. If your app is _not_ correctly configured, you will see a warning like so:
 
 ```
-IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured for https://android-sdk.idura.id/my/custom/callback
+IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured for https://android-sdk.idura.broker/my/custom/callback
 ```
 
 ## Logging in
@@ -120,7 +120,7 @@ val streetAddress = jwt.getClaimAsMap("address")?.get("street_address") as? Stri
 
 ## Using a custom callback domain
 
-In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards idura.id, you do not need to do anything else.
+In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards criipto.id / idura.broker, you do not need to do anything else.
 
 If you want to use another domain, you need to host an `assetslinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
 
