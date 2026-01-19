@@ -61,6 +61,7 @@ import com.auth0.jwt.JWT as Auth0JWT
 import io.opentelemetry.context.Context as OtelContext
 
 internal const val TAG = "IduraVerify"
+internal const val APPSWITCH_QUERY_PARAM = "idura_android_sdk_appswitch"
 
 private const val BRAVE = "com.brave.browser"
 private const val EDGE = "com.microsoft.emmx"
@@ -103,7 +104,6 @@ class IduraVerify(
   private val clientID: String,
   private val domain: String,
   private val redirectUri: Uri = "https://$domain/android/callback".toUri(),
-  private val appSwitchUri: Uri? = "https://$domain/android/callback/appswitch".toUri(),
   private val activity: ComponentActivity,
 ) : DefaultLifecycleObserver {
   private val httpClient =
@@ -150,10 +150,8 @@ class IduraVerify(
   private var foundASuitableBrowser = false
 
   init {
-    for (uri in listOf(redirectUri, appSwitchUri)) {
-      if (uri != null && uri.scheme != "https") {
-        throw Exception("redirectUri and appSwitchUri must be HTTPS URIs")
-      }
+    if (redirectUri.scheme != "https") {
+      throw Exception("redirectUri must be HTTPS URIs")
     }
 
     if (activity.lifecycle.currentState != Lifecycle.State.INITIALIZED) {
@@ -242,9 +240,6 @@ class IduraVerify(
       }
 
     verifyAppLink(redirectUri)
-    if (appSwitchUri != null) {
-      verifyAppLink(appSwitchUri)
-    }
 
     val (browserName, browserMatcher) = findSuitableBrowser()
 
@@ -401,9 +396,14 @@ class IduraVerify(
             ) + eid.loginHints
           ) as MutableSet<String>
 
-        if (eid is DanishMitID && appSwitchUri != null) {
+        if (eid is DanishMitID) {
           loginHints.add("appswitch:android")
-          loginHints.add("appswitch:resumeUrl:$appSwitchUri")
+          loginHints.add(
+            "appswitch:resumeUrl:${redirectUri.buildUpon().appendQueryParameter(
+              APPSWITCH_QUERY_PARAM,
+              null,
+            ).build()}",
+          )
         }
 
         val scopes = eid.scopes + listOf("openid")

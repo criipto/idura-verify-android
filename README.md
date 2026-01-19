@@ -30,11 +30,10 @@ The SDK needs to be configured with two pieces of information:
 
 The SDK assumes that:
 
-- You will be using your [Idura domain](https://docs.idura.com/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URLs (both custom (vanity) domains, and \*.idura.id domains can be used).
+- You will be using your [Idura domain](https://docs.idura.com/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
 - Your redirect URL will be `https://[YOUR IDURA DOMAIN]/android/callback`.
-- Your app switch URL will be `https://[YOUR IDURA DOMAIN]/android/callback/appswitch`.
 
-You should register these as callback URLs in the [Idura dashboard](https://dashboard.idura.com). To override these values, see the [Customization section](#customization).
+You should register the callback URL in the [Idura dashboard](https://dashboard.idura.com). To override these values, see the [Customization section](#customization).
 
 The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and app switch URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest)
 
@@ -47,7 +46,7 @@ android {
   }
 
   val iduraClientId = "urn:my:application:identifier:XXXX"
-  val iduraDomain = "this-is-an-example.idura.id"
+  val iduraDomain = "this-is-an-example.idura.broker
 
   defaultConfig {
     manifestPlaceholders["iduraDomain"] = iduraDomain
@@ -93,7 +92,7 @@ During development, you can get the fingerprint of your local signing key by run
 When the SDK is initialized, it will verify that your app is configured to capture the app links. If your app is _not_ correctly configured, you will see a warning like so:
 
 ```
-IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured for https://android-sdk.idura.id/my/custom/callback
+IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured for https://android-sdk.idura.broker/my/custom/callback
 ```
 
 ## Logging in
@@ -121,15 +120,15 @@ val streetAddress = jwt.getClaimAsMap("address")?.get("street_address") as? Stri
 
 ## Using a custom callback domain
 
-In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards idura.id, you do not need to do anything else.
+In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards criipto.id / idura.broker, you do not need to do anything else.
 
 If you want to use another domain, you need to host an `assetslinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
 
-## Using custom callback URLs
+## Using a custom callback URL
 
-If you want to use different callback and app switch URLs you need to:
+If you want to a different callback URL you need to:
 
-1. Pass these when initializing the SDK:
+1. Pass it when initializing the SDK:
 
 ```kt
 IduraVerify(
@@ -137,11 +136,10 @@ IduraVerify(
   BuildConfig.IDURA_DOMAIN,
   activity = activity,
   redirectUri = "https://${BuildConfig.IDURA_DOMAIN}/my/custom/callback".toUri(),
-  appSwitchUri = "https://${BuildConfig.IDURA_DOMAIN}/my/custom/appswitch".toUri(),
 )
 ```
 
-2. Update your manifest to capture the new URLs:
+2. Update your manifest to capture the new URL:
 
 ```xml
 <application>
@@ -159,22 +157,6 @@ IduraVerify(
       <data android:scheme="https" />
       <data android:host="${iduraDomain}" />
       <data android:path="/my/custom/callback" />
-    </intent-filter>
-  </activity>
-
-  <activity
-    android:name="eu.idura.verify.AppSwitchActivity"
-    android:exported="true"
-    tools:node="replace">
-    <intent-filter android:autoVerify="true">
-      <action android:name="android.intent.action.VIEW" />
-
-      <category android:name="android.intent.category.DEFAULT" />
-      <category android:name="android.intent.category.BROWSABLE" />
-
-      <data android:scheme="https" />
-      <data android:host="${iduraDomain}" />
-      <data android:path="/my/custom/appswitch" />
     </intent-filter>
   </activity>
 </application>
