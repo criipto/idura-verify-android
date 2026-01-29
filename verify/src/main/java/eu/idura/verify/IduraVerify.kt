@@ -16,6 +16,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.algorithms.Algorithm
+import eu.idura.verify.BuildConfig
 import eu.idura.verify.eid.DanishMitID
 import eu.idura.verify.eid.EID
 import io.ktor.client.HttpClient
@@ -233,7 +234,13 @@ class IduraVerify(
 
   override fun onCreate(owner: LifecycleOwner) {
     tabType =
-      if (CustomTabsClient.isAuthTabSupported(
+      if (BuildConfig.DEBUG && BuildConfig.TAB_TYPE !== "AUTO") {
+        when (BuildConfig.TAB_TYPE) {
+          "CUSTOM_TAB" -> TabType.CustomTab
+          "AUTH_TAB" -> TabType.AuthTab
+          else -> throw Error("Unsupported tab type override, ${BuildConfig.TAB_TYPE}")
+        }
+      } else if (CustomTabsClient.isAuthTabSupported(
           activity,
           Browsers.Chrome.PACKAGE_NAME,
         )

@@ -213,6 +213,7 @@ fun LoginScreen(
           val buttonModifier = Modifier.fillMaxWidth()
 
           Text(text = "Login", fontSize = 30.sp)
+          Text(text = "Using ${BuildConfig.TAB_TYPE}")
           Spacer(modifier = Modifier.height(50.dp))
 
           val errorMessage = loginState.errorMessage
