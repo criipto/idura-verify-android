@@ -6,6 +6,23 @@ plugins {
 }
 
 android {
+  flavorDimensions += "tabType"
+
+  productFlavors {
+    create("automaticTabSelection") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"AUTO\"")
+    }
+    create("customTab") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"CUSTOM_TAB\"")
+    }
+    create("authTab") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"AUTH_TAB\"")
+    }
+  }
+
   buildFeatures {
     buildConfig = true
   }
@@ -80,4 +97,14 @@ dependencies {
   androidTestImplementation(exampleLibs.androidx.compose.ui.test.junit4)
   debugImplementation(exampleLibs.androidx.compose.ui.tooling)
   debugImplementation(exampleLibs.androidx.compose.ui.test.manifest)
+}
+
+tasks.register("runAllBrowserTests") {
+  group = "verification"
+  description = "Runs UIAutomator tests for both Custom Tab and Auth Tab paths."
+
+  // Run Custom Tabs flavor tests
+  dependsOn("connectedCustomTabDebugAndroidTest")
+  // Run Auth Tab flavor tests
+  dependsOn("connectedAuthTabDebugAndroidTest")
 }

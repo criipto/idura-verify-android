@@ -1,3 +1,5 @@
+import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
+
 plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.kotlin.android)
@@ -13,6 +15,23 @@ if (providers.gradleProperty("snapshot").getOrNull() != null) {
 setVersion(version)
 
 android {
+  flavorDimensions += "tabType"
+
+  productFlavors {
+    create("automaticTabSelection") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"AUTO\"")
+    }
+    create("customTab") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"CUSTOM_TAB\"")
+    }
+    create("authTab") {
+      dimension = "tabType"
+      buildConfigField("String", "TAB_TYPE", "\"AUTH_TAB\"")
+    }
+  }
+
   buildFeatures {
     buildConfig = true
   }
@@ -49,6 +68,7 @@ android {
 }
 
 mavenPublishing {
+  configure(AndroidSingleVariantLibrary("automaticTabSelectionRelease"))
   publishToMavenCentral()
 
   signAllPublications()
