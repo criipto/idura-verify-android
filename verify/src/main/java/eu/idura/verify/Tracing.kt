@@ -275,7 +275,7 @@ internal suspend inline fun <T> SpanBuilder.startAndRun(crossinline block: suspe
 
     span.setStatus(StatusCode.OK)
     return result
-  } catch (exception: Exception) {
+  } catch (exception: Throwable) {
     span.setStatus(StatusCode.ERROR, exception.message ?: "")
     span.recordException(exception)
     throw exception

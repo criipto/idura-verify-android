@@ -61,7 +61,7 @@ class LoginViewModel(
             jwt.identityScheme,
           )
         }
-      } catch (ex: Exception) {
+      } catch (ex: Throwable) {
         _uiState.update { LoginState.NotLoggedIn(ex.localizedMessage) }
       }
     }
