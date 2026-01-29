@@ -75,6 +75,8 @@ dependencies {
   implementation(project(":verify"))
   // implementation(exampleLibs.verify)
 
+  androidTestImplementation(exampleLibs.androidx.test.uiautomator)
+
   androidTestImplementation(platform(exampleLibs.androidx.compose.bom))
   androidTestImplementation(exampleLibs.androidx.compose.ui.test.junit4)
   debugImplementation(exampleLibs.androidx.compose.ui.tooling)
