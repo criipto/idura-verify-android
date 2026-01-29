@@ -58,17 +58,21 @@ fun MainScreen(loginViewModel: LoginViewModel) {
   val loginState by loginViewModel.uiState.collectAsState()
 
   return when (loginState) {
-    is LoginState.LoggedIn ->
+    is LoginState.LoggedIn -> {
       LoggedInScreen(loginState as LoginState.LoggedIn) {
         loginViewModel.logout()
       }
+    }
 
-    is LoginState.NotLoggedIn ->
+    is LoginState.NotLoggedIn -> {
       LoginScreen(loginState as LoginState.NotLoggedIn) { eid ->
         loginViewModel.login(eid)
       }
+    }
 
-    is LoginState.Loading -> LoadingScreen()
+    is LoginState.Loading -> {
+      LoadingScreen()
+    }
   }
 }
 

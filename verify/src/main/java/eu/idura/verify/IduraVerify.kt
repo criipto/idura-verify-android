@@ -185,21 +185,25 @@ class IduraVerify(
                 .build()
 
             return when (request) {
-              is AuthorizationRequest ->
+              is AuthorizationRequest -> {
                 AuthorizationManagementActivity.createStartForResultIntent(
                   activity,
                   request,
                   customTabIntent.intent
                     .setData(uri),
                 )
+              }
 
-              is EndSessionRequest ->
+              is EndSessionRequest -> {
                 authorizationService.getEndSessionRequestIntent(
                   request,
                   customTabIntent,
                 )
+              }
 
-              else -> throw Exception("Unsupported request type $input")
+              else -> {
+                throw Exception("Unsupported request type $input")
+              }
             }
           }
 
@@ -274,6 +278,7 @@ class IduraVerify(
       TabType.AuthTab -> {
         Pair(Browsers.Chrome.PACKAGE_NAME, BrowserMatcher { false })
       }
+
       TabType.CustomTab -> {
         val preferredBrowser =
           listOf(
@@ -345,17 +350,29 @@ class IduraVerify(
     Log.i(TAG, "Handling auth tab result. Code: ${result.resultCode}")
 
     when (result.resultCode) {
-      AuthTabIntent.RESULT_OK -> handleResultUri(result.resultUri!!)
-      AuthTabIntent.RESULT_CANCELED -> handleException(Exception("RESULT_CANCELED"))
-      AuthTabIntent.RESULT_UNKNOWN_CODE -> handleException(Exception("RESULT_UNKNOWN_CODE"))
-      AuthTabIntent.RESULT_VERIFICATION_FAILED ->
+      AuthTabIntent.RESULT_OK -> {
+        handleResultUri(result.resultUri!!)
+      }
+
+      AuthTabIntent.RESULT_CANCELED -> {
+        handleException(Exception("RESULT_CANCELED"))
+      }
+
+      AuthTabIntent.RESULT_UNKNOWN_CODE -> {
+        handleException(Exception("RESULT_UNKNOWN_CODE"))
+      }
+
+      AuthTabIntent.RESULT_VERIFICATION_FAILED -> {
         handleException(
           Exception("RESULT_VERIFICATION_FAILED"),
         )
-      AuthTabIntent.RESULT_VERIFICATION_TIMED_OUT ->
+      }
+
+      AuthTabIntent.RESULT_VERIFICATION_TIMED_OUT -> {
         handleException(
           Exception("RESULT_VERIFICATION_TIMED_OUT"),
         )
+      }
     }
   }
 
