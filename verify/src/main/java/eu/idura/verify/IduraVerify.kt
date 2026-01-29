@@ -429,7 +429,11 @@ class IduraVerify(
 
         val callbackUri = launchBrowser(authorizationRequest, parRequestUri)
 
-        exchangeCode(authorizationRequest, callbackUri)
+        if (callbackUri.getQueryParameter("code") != null) {
+          return@startAndRun exchangeCode(authorizationRequest, callbackUri)
+        } else {
+          throw Exception("OIDC flow returned error: ${callbackUri.getQueryParameter("error")}")
+        }
       }
 
   private suspend fun exchangeCode(
