@@ -18,6 +18,7 @@ import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.algorithms.Algorithm
 import eu.idura.verify.eid.DanishMitID
 import eu.idura.verify.eid.EID
+import eu.idura.verify.eid.FrejaID
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
@@ -414,7 +415,7 @@ class IduraVerify(
             ) + eid.loginHints
           ) as MutableSet<String>
 
-        if (eid is DanishMitID) {
+        if (eid is DanishMitID || eid is FrejaID) {
           loginHints.add("appswitch:android")
           loginHints.add(
             "appswitch:resumeUrl:${redirectUri.buildUpon().appendQueryParameter(
