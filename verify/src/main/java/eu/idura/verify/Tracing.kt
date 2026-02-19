@@ -19,21 +19,15 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.context.propagation.TextMapSetter
-import io.opentelemetry.extension.kotlin.asContextElement
-import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.common.CompletableResultCode
+import io.opentelemetry.sdk.resources.Resource
 import io.opentelemetry.sdk.trace.IdGenerator
-import io.opentelemetry.sdk.trace.ReadWriteSpan
-import io.opentelemetry.sdk.trace.ReadableSpan
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.SpanProcessor
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -86,7 +80,7 @@ private class HeimdalExporter(
                       durationAttribute to
                         nanosToMs(spanData.endEpochNanos - spanData.startEpochNanos),
                     ),
-                  )
+                  ).plus(spanData.resource.attributes.asMap())
 
               if (spanData.status.statusCode === StatusCode.ERROR &&
                 !spanData.status.description.isEmpty()
@@ -133,62 +127,6 @@ private class HeimdalExporter(
   override fun shutdown(): CompletableResultCode? = CompletableResultCode.ofSuccess()
 }
 
-private class IduraAttributesProcessor(
-  private val serverAddress: String,
-) : SpanProcessor {
-  // Store a GUID, to help correlate session (such as SDK init, and logins) from the same device.
-  // The session ID is intentionally not saved, so it is regenerated when the app restarts. See https://developer.android.com/identity/user-data-ids#instance-ids-guids
-  private val sessionId = UUID.randomUUID().toString()
-  private val serverAddressAttribute =
-    AttributeKey
-      .stringKey("server.address")
-  private val platformAttribute =
-    AttributeKey
-      .stringKey("device.platform")
-  private val sdkVersionAttribute =
-    AttributeKey
-      .longKey("device.sdk")
-  private val releaseAttribute =
-    AttributeKey
-      .stringKey("device.release")
-  private val brandAttribute =
-    AttributeKey
-      .stringKey("device.brand")
-  private val manufacturerAttribute =
-    AttributeKey
-      .stringKey("device.manufacturer")
-  private val modelAttribute =
-    AttributeKey
-      .stringKey("device.model")
-  private val iduraSdkVersionAttribute =
-    AttributeKey
-      .stringKey("idura.sdk.version")
-  private val sessionIdAttribute =
-    AttributeKey
-      .stringKey("device.session.id")
-
-  override fun onStart(
-    parentContext: Context,
-    span: ReadWriteSpan,
-  ) {
-    span.setAttribute(serverAddressAttribute, serverAddress)
-    span.setAttribute(platformAttribute, "android")
-    span.setAttribute(sdkVersionAttribute, Build.VERSION.SDK_INT_FULL)
-    span.setAttribute(releaseAttribute, Build.VERSION.RELEASE)
-    span.setAttribute(brandAttribute, Build.BRAND)
-    span.setAttribute(manufacturerAttribute, Build.MANUFACTURER)
-    span.setAttribute(modelAttribute, Build.MODEL)
-    span.setAttribute(iduraSdkVersionAttribute, BuildConfig.VERSION)
-    span.setAttribute(sessionIdAttribute, sessionId)
-  }
-
-  override fun isStartRequired(): Boolean = true
-
-  override fun onEnd(span: ReadableSpan) = Unit
-
-  override fun isEndRequired(): Boolean = false
-}
-
 private class IduraIdGenerator : IdGenerator {
   private val uuidV7Generator =
     Generators
@@ -214,8 +152,26 @@ internal class Tracing(
       .builder()
       .setIdGenerator(
         IduraIdGenerator(),
-      ).addSpanProcessor(IduraAttributesProcessor(serverAddress))
-      .addSpanProcessor(
+      ).setResource(
+        Resource
+          .getDefault()
+          .toBuilder()
+          // Inspired by https://github.com/open-telemetry/opentelemetry-android/blob/79f7a5280a04bc39696dfdc4cdc9e009eac98257/core/src/main/java/io/opentelemetry/android/AndroidResource.kt
+          .put("os.name", "android")
+          .put("os.type", "linux")
+          .put("os.version", Build.VERSION.RELEASE)
+          .put("device.model.name", Build.MODEL)
+          .put("device.model.identifier", Build.MODEL)
+          .put("device.manufacturer", Build.MANUFACTURER)
+          .put("android.os.api_level", Build.VERSION.SDK_INT.toString())
+          // Idura specific attributes
+          .put("server.address", serverAddress)
+          .put("idura.sdk.version", BuildConfig.VERSION)
+          // Store a GUID, to help correlate session (such as SDK init, and logins) from the same device.
+          // The session ID is intentionally not saved, so it is regenerated when the app restarts. See https://developer.android.com/identity/user-data-ids#instance-ids-guids
+          .put("device.session.id", UUID.randomUUID().toString())
+          .build(),
+      ).addSpanProcessor(
         BatchSpanProcessor
           .builder(
             HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
