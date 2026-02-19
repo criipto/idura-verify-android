@@ -11,6 +11,7 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanBuilder
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.api.trace.Tracer
@@ -18,21 +19,15 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.context.propagation.TextMapSetter
-import io.opentelemetry.extension.kotlin.asContextElement
-import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.common.CompletableResultCode
+import io.opentelemetry.sdk.resources.Resource
 import io.opentelemetry.sdk.trace.IdGenerator
-import io.opentelemetry.sdk.trace.ReadWriteSpan
-import io.opentelemetry.sdk.trace.ReadableSpan
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.SpanProcessor
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -85,7 +80,7 @@ private class HeimdalExporter(
                       durationAttribute to
                         nanosToMs(spanData.endEpochNanos - spanData.startEpochNanos),
                     ),
-                  )
+                  ).plus(spanData.resource.attributes.asMap())
 
               if (spanData.status.statusCode === StatusCode.ERROR &&
                 !spanData.status.description.isEmpty()
@@ -132,62 +127,6 @@ private class HeimdalExporter(
   override fun shutdown(): CompletableResultCode? = CompletableResultCode.ofSuccess()
 }
 
-private class IduraAttributesProcessor(
-  private val serverAddress: String,
-) : SpanProcessor {
-  // Store a GUID, to help correlate session (such as SDK init, and logins) from the same device.
-  // The session ID is intentionally not saved, so it is regenerated when the app restarts. See https://developer.android.com/identity/user-data-ids#instance-ids-guids
-  private val sessionId = UUID.randomUUID().toString()
-  private val serverAddressAttribute =
-    AttributeKey
-      .stringKey("server.address")
-  private val platformAttribute =
-    AttributeKey
-      .stringKey("device.platform")
-  private val sdkVersionAttribute =
-    AttributeKey
-      .longKey("device.sdk")
-  private val releaseAttribute =
-    AttributeKey
-      .stringKey("device.release")
-  private val brandAttribute =
-    AttributeKey
-      .stringKey("device.brand")
-  private val manufacturerAttribute =
-    AttributeKey
-      .stringKey("device.manufacturer")
-  private val modelAttribute =
-    AttributeKey
-      .stringKey("device.model")
-  private val iduraSdkVersionAttribute =
-    AttributeKey
-      .stringKey("idura.sdk.version")
-  private val sessionIdAttribute =
-    AttributeKey
-      .stringKey("device.session.id")
-
-  override fun onStart(
-    parentContext: Context,
-    span: ReadWriteSpan,
-  ) {
-    span.setAttribute(serverAddressAttribute, serverAddress)
-    span.setAttribute(platformAttribute, "android")
-    span.setAttribute(sdkVersionAttribute, Build.VERSION.SDK_INT_FULL)
-    span.setAttribute(releaseAttribute, Build.VERSION.RELEASE)
-    span.setAttribute(brandAttribute, Build.BRAND)
-    span.setAttribute(manufacturerAttribute, Build.MANUFACTURER)
-    span.setAttribute(modelAttribute, Build.MODEL)
-    span.setAttribute(iduraSdkVersionAttribute, BuildConfig.VERSION)
-    span.setAttribute(sessionIdAttribute, sessionId)
-  }
-
-  override fun isStartRequired(): Boolean = true
-
-  override fun onEnd(span: ReadableSpan) = Unit
-
-  override fun isEndRequired(): Boolean = false
-}
-
 private class IduraIdGenerator : IdGenerator {
   private val uuidV7Generator =
     Generators
@@ -208,33 +147,46 @@ internal class Tracing(
   serverAddress: String,
   client: HttpClient,
 ) {
-  private val sdk =
-    OpenTelemetrySdk
+  private val tracerProvider =
+    SdkTracerProvider
       .builder()
-      .setPropagators(
-        ContextPropagators.create(W3CTraceContextPropagator.getInstance()),
-      ).setTracerProvider(
-        SdkTracerProvider
-          .builder()
-          .setIdGenerator(
-            IduraIdGenerator(),
-          ).addSpanProcessor(IduraAttributesProcessor(serverAddress))
-          .addSpanProcessor(
-            BatchSpanProcessor
-              .builder(
-                HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
-              ).build(),
+      .setIdGenerator(
+        IduraIdGenerator(),
+      ).setResource(
+        Resource
+          .getDefault()
+          .toBuilder()
+          // Inspired by https://github.com/open-telemetry/opentelemetry-android/blob/79f7a5280a04bc39696dfdc4cdc9e009eac98257/core/src/main/java/io/opentelemetry/android/AndroidResource.kt
+          .put("os.name", "android")
+          .put("os.type", "linux")
+          .put("os.version", Build.VERSION.RELEASE)
+          .put("device.model.name", Build.MODEL)
+          .put("device.model.identifier", Build.MODEL)
+          .put("device.manufacturer", Build.MANUFACTURER)
+          .put("android.os.api_level", Build.VERSION.SDK_INT.toString())
+          // Idura specific attributes
+          .put("server.address", serverAddress)
+          .put("idura.sdk.version", BuildConfig.VERSION)
+          // Store a GUID, to help correlate session (such as SDK init, and logins) from the same device.
+          // The session ID is intentionally not saved, so it is regenerated when the app restarts. See https://developer.android.com/identity/user-data-ids#instance-ids-guids
+          .put("device.session.id", UUID.randomUUID().toString())
+          .build(),
+      ).addSpanProcessor(
+        BatchSpanProcessor
+          .builder(
+            HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
           ).build(),
       ).build()
 
-  fun close() = sdk.close()
+  fun close() = tracerProvider.close()
 
   fun getTracer(
     instrumentationScopeName: String,
     instrumentationScopeVersion: String,
-  ): Tracer = sdk.getTracer(instrumentationScopeName, instrumentationScopeVersion)
+  ): Tracer = tracerProvider.get(instrumentationScopeName, instrumentationScopeVersion)
 
-  fun propagators(): ContextPropagators = sdk.propagators
+  fun propagators(): ContextPropagators =
+    ContextPropagators.create(W3CTraceContextPropagator.getInstance())
 }
 
 internal object KtorRequestSetter : TextMapSetter<HttpRequestBuilder> {
@@ -250,29 +202,25 @@ internal object KtorRequestSetter : TextMapSetter<HttpRequestBuilder> {
 /**
  * Utility function which wraps a block of code in a span:
  * 1. Start the span
- * 2. Make it the current span
- * 3. Execute the block of code
+ * 2. Execute the block of code
  *    a. If the block completes, set status to OK
  *    b. Otherwise, set status to ERROR
- * 4. Close the current scope
- * 5. End the span
+ * 3. Close the current scope
+ * 4. End the span
  *
  * This is very similar to `ExtendedSpanBuilder.startAndRun` https://github.com/open-telemetry/opentelemetry-java/blob/36ca9b85b799939b6cb650c5fe95e90ee2f87059/sdk/trace/src/main/java/io/opentelemetry/sdk/trace/ExtendedSdkSpanBuilder.java#L156
  * from the OTEL SDK, with two notable exceptions:
  * 1. It sets status to OK when the block completes successfully
  * 2. It supports suspend functions
+ * 3. It does not update the current OTEL context. Instead, the SDK relies on manually passing spans
  */
-internal suspend inline fun <T> SpanBuilder.startAndRun(crossinline block: suspend () -> T): T {
+internal suspend inline fun <T> SpanBuilder.startAndRun(
+  crossinline block: suspend (span: Span) -> T,
+): T {
   val span = this.startSpan()
 
   try {
-    val result =
-      coroutineScope {
-        async(span.asContextElement()) {
-          block()
-        }
-      }.await()
-
+    val result = block(span)
     span.setStatus(StatusCode.OK)
     return result
   } catch (exception: Throwable) {
@@ -283,3 +231,6 @@ internal suspend inline fun <T> SpanBuilder.startAndRun(crossinline block: suspe
     span.end()
   }
 }
+
+internal fun SpanBuilder.withSpanContext(span: Span) =
+  this.setParent(span.storeInContext(Context.current()))
