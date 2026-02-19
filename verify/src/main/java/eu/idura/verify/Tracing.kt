@@ -208,31 +208,34 @@ internal class Tracing(
   serverAddress: String,
   client: HttpClient,
 ) {
+  private val tracerProvider =
+    SdkTracerProvider
+      .builder()
+      .setIdGenerator(
+        IduraIdGenerator(),
+      ).addSpanProcessor(IduraAttributesProcessor(serverAddress))
+      .addSpanProcessor(
+        BatchSpanProcessor
+          .builder(
+            HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
+          ).build(),
+      ).build()
   private val sdk =
     OpenTelemetrySdk
       .builder()
       .setPropagators(
         ContextPropagators.create(W3CTraceContextPropagator.getInstance()),
-      ).setTracerProvider(
-        SdkTracerProvider
-          .builder()
-          .setIdGenerator(
-            IduraIdGenerator(),
-          ).addSpanProcessor(IduraAttributesProcessor(serverAddress))
-          .addSpanProcessor(
-            BatchSpanProcessor
-              .builder(
-                HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
-              ).build(),
-          ).build(),
       ).build()
 
-  fun close() = sdk.close()
+  fun close() {
+    sdk.close()
+    tracerProvider.close()
+  }
 
   fun getTracer(
     instrumentationScopeName: String,
     instrumentationScopeVersion: String,
-  ): Tracer = sdk.getTracer(instrumentationScopeName, instrumentationScopeVersion)
+  ): Tracer = tracerProvider.get(instrumentationScopeName, instrumentationScopeVersion)
 
   fun propagators(): ContextPropagators = sdk.propagators
 }
