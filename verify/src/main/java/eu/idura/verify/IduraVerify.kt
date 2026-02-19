@@ -396,10 +396,11 @@ class IduraVerify(
       .spanBuilder(
         "android sdk login",
       ).setAttribute("acr_value", eid.acrValue)
-      .startAndRun {
+      .setNoParent()
+      .startAndRun { span ->
         Log.i(
           TAG,
-          "Starting login with ${eid.acrValue}, traceId ${Span.current().spanContext.traceId}",
+          "Starting login with ${eid.acrValue}, traceId ${span.spanContext.traceId}",
         )
 
         if (!foundASuitableBrowser) {
@@ -442,12 +443,12 @@ class IduraVerify(
             .setPrompt(prompt?.str)
             .build()
 
-        val parRequestUri = pushAuthorizationRequest(authorizationRequest)
+        val parRequestUri = pushAuthorizationRequest(authorizationRequest, span)
 
-        val callbackUri = launchBrowser(authorizationRequest, parRequestUri)
+        val callbackUri = launchBrowser(authorizationRequest, parRequestUri, span)
 
         if (callbackUri.getQueryParameter("code") != null) {
-          return@startAndRun exchangeCode(authorizationRequest, callbackUri)
+          return@startAndRun exchangeCode(authorizationRequest, callbackUri, span)
         } else {
           throw Exception("OIDC flow returned error: ${callbackUri.getQueryParameter("error")}")
         }
@@ -456,35 +457,40 @@ class IduraVerify(
   private suspend fun exchangeCode(
     request: AuthorizationRequest,
     callbackUri: Uri,
+    span: Span,
   ): JWT {
     val tokenResponse =
-      tracer.spanBuilder("code exchange").startAndRun {
-        val response =
-          AuthorizationResponse
-            .Builder(request)
-            .fromUri(callbackUri)
-            .build()
+      tracer
+        .spanBuilder(
+          "code exchange",
+        ).withSpanContext(span)
+        .startAndRun {
+          val response =
+            AuthorizationResponse
+              .Builder(request)
+              .fromUri(callbackUri)
+              .build()
 
-        if (!validateState(request, response)) {
-          throw Exception("State mismatch")
-        }
+          if (!validateState(request, response)) {
+            throw Exception("State mismatch")
+          }
 
-        suspendCoroutine { continuation ->
-          authorizationService.performTokenRequest(
-            response.createTokenExchangeRequest(),
-          ) { tokenResponse, ex ->
-            if (ex != null) {
-              continuation.resumeWithException(ex)
-            } else {
-              // From TokenResponseCallback - Exactly one of `response` or `ex` will be non-null. So
-              // when we reach this line, we know that response is not null.
-              continuation.resume(tokenResponse!!)
+          suspendCoroutine { continuation ->
+            authorizationService.performTokenRequest(
+              response.createTokenExchangeRequest(),
+            ) { tokenResponse, ex ->
+              if (ex != null) {
+                continuation.resumeWithException(ex)
+              } else {
+                // From TokenResponseCallback - Exactly one of `response` or `ex` will be non-null. So
+                // when we reach this line, we know that response is not null.
+                continuation.resume(tokenResponse!!)
+              }
             }
           }
         }
-      }
 
-    return tracer.spanBuilder("JWT verification").startAndRun {
+    return tracer.spanBuilder("JWT verification").withSpanContext(span).startAndRun {
       val idToken = tokenResponse.idToken!!
       val decodedJWT = Auth0JWT.decode(idToken)
 
@@ -523,33 +529,41 @@ class IduraVerify(
     return true
   }
 
-  suspend fun logout(idToken: String?) {
-    val endSessionRequest =
-      EndSessionRequest
-        .Builder(
-          getIduraOIDCConfiguration(),
-        ).setIdTokenHint(idToken)
-        .setPostLogoutRedirectUri(redirectUri)
-        .build()
+  suspend fun logout(idToken: String?) =
+    tracer
+      .spanBuilder(
+        "android sdk logout",
+      ).setNoParent()
+      .startAndRun { span ->
+        val endSessionRequest =
+          EndSessionRequest
+            .Builder(
+              getIduraOIDCConfiguration(),
+            ).setIdTokenHint(idToken)
+            .setPostLogoutRedirectUri(redirectUri)
+            .build()
 
-    val callbackUri = launchBrowser(endSessionRequest)
+        val callbackUri = launchBrowser(endSessionRequest, endSessionRequest.toUri(), span)
 
-    val response =
-      EndSessionResponse
-        .Builder(endSessionRequest)
-        .setState(
-          callbackUri.getQueryParameter(
-            "state",
-          ),
-        ).build()
+        val response =
+          EndSessionResponse
+            .Builder(endSessionRequest)
+            .setState(
+              callbackUri.getQueryParameter(
+                "state",
+              ),
+            ).build()
 
-    validateState(endSessionRequest, response)
-  }
+        validateState(endSessionRequest, response)
+      }
 
   /**
    * Starts the PAR flow, as described in https://datatracker.ietf.org/doc/html/rfc9126
    */
-  private suspend fun pushAuthorizationRequest(authorizationRequest: AuthorizationRequest): Uri {
+  private suspend fun pushAuthorizationRequest(
+    authorizationRequest: AuthorizationRequest,
+    span: Span,
+  ): Uri {
     val authorizationRequestUri = authorizationRequest.toUri()
     val response =
       httpClient.submitForm(
@@ -568,7 +582,7 @@ class IduraVerify(
           ),
       ) {
         tracing.propagators().textMapPropagator.inject(
-          OtelContext.current(),
+          span.storeInContext(OtelContext.current()),
           this,
           KtorRequestSetter,
         )
@@ -605,10 +619,12 @@ class IduraVerify(
   private suspend fun launchBrowser(
     request: AuthorizationManagementRequest,
     uri: Uri = request.toUri(),
+    span: Span,
   ): Uri =
     tracer
       .spanBuilder("launch browser")
       .setAttribute("browser", browserDescription)
+      .withSpanContext(span)
       .startAndRun {
         suspendCoroutine { continuation ->
           browserFlowContinuation = continuation

@@ -11,6 +11,7 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.opentelemetry.api.common.AttributeKey
+import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanBuilder
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.api.trace.Tracer
@@ -220,24 +221,16 @@ internal class Tracing(
             HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
           ).build(),
       ).build()
-  private val sdk =
-    OpenTelemetrySdk
-      .builder()
-      .setPropagators(
-        ContextPropagators.create(W3CTraceContextPropagator.getInstance()),
-      ).build()
 
-  fun close() {
-    sdk.close()
-    tracerProvider.close()
-  }
+  fun close() = tracerProvider.close()
 
   fun getTracer(
     instrumentationScopeName: String,
     instrumentationScopeVersion: String,
   ): Tracer = tracerProvider.get(instrumentationScopeName, instrumentationScopeVersion)
 
-  fun propagators(): ContextPropagators = sdk.propagators
+  fun propagators(): ContextPropagators =
+    ContextPropagators.create(W3CTraceContextPropagator.getInstance())
 }
 
 internal object KtorRequestSetter : TextMapSetter<HttpRequestBuilder> {
@@ -253,29 +246,25 @@ internal object KtorRequestSetter : TextMapSetter<HttpRequestBuilder> {
 /**
  * Utility function which wraps a block of code in a span:
  * 1. Start the span
- * 2. Make it the current span
- * 3. Execute the block of code
+ * 2. Execute the block of code
  *    a. If the block completes, set status to OK
  *    b. Otherwise, set status to ERROR
- * 4. Close the current scope
- * 5. End the span
+ * 3. Close the current scope
+ * 4. End the span
  *
  * This is very similar to `ExtendedSpanBuilder.startAndRun` https://github.com/open-telemetry/opentelemetry-java/blob/36ca9b85b799939b6cb650c5fe95e90ee2f87059/sdk/trace/src/main/java/io/opentelemetry/sdk/trace/ExtendedSdkSpanBuilder.java#L156
  * from the OTEL SDK, with two notable exceptions:
  * 1. It sets status to OK when the block completes successfully
  * 2. It supports suspend functions
+ * 3. It does not update the current OTEL context. Instead, the SDK relies on manually passing spans
  */
-internal suspend inline fun <T> SpanBuilder.startAndRun(crossinline block: suspend () -> T): T {
+internal suspend inline fun <T> SpanBuilder.startAndRun(
+  crossinline block: suspend (span: Span) -> T,
+): T {
   val span = this.startSpan()
 
   try {
-    val result =
-      coroutineScope {
-        async(span.asContextElement()) {
-          block()
-        }
-      }.await()
-
+    val result = block(span)
     span.setStatus(StatusCode.OK)
     return result
   } catch (exception: Throwable) {
@@ -286,3 +275,6 @@ internal suspend inline fun <T> SpanBuilder.startAndRun(crossinline block: suspe
     span.end()
   }
 }
+
+internal fun SpanBuilder.withSpanContext(span: Span) =
+  this.setParent(span.storeInContext(Context.current()))
