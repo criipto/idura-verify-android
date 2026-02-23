@@ -4,6 +4,7 @@ activityCompose = "1.11.0"
 lifecycleRuntimeKtx = "2.9.4"
 coreKtx = "1.17.0"
 verify = "1.0.0"
+uiautomator = "2.4.0-alpha07"
 
 [libraries]
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -17,5 +18,7 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+
+androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 
 verify = { group = "eu.idura", name= "verify", version.ref = "verify" }
