@@ -1,6 +1,7 @@
 package eu.idura.verify.eid
 
 import eu.idura.verify.Action
+import kotlin.io.encoding.Base64
 
 sealed class EID<T : EID<T>>(
   acrValue: String,
@@ -32,6 +33,9 @@ sealed class EID<T : EID<T>>(
     this.action = action
     return getThis()
   }
+
+  protected open fun withMessage(message: String) =
+    withLoginHint("message:${Base64.encode(message.toByteArray())}")
 
   internal val acrValue: String
     get() = acrValues.joinToString(":")

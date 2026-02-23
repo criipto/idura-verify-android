@@ -2,7 +2,6 @@ package eu.idura.verify.eid
 
 import eu.idura.verify.Action
 import java.util.UUID
-import kotlin.io.encoding.Base64
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -43,8 +42,7 @@ class DanishMitID private constructor() : EID<DanishMitID>(acrValue = "urn:grn:a
 
   fun withAddress() = withScope("address")
 
-  fun withMessage(message: String) =
-    withLoginHint("message:${Base64.Default.encode(message.toByteArray())}")
+  public override fun withMessage(message: String) = super.withMessage(message)
 
   public override fun withAction(action: Action) = super.withAction(action)
 }

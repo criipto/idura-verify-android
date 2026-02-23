@@ -31,9 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.idura.verify.eid.DanishMitID
 import eu.idura.verify.eid.EID
+import eu.idura.verify.eid.FrejaID
 import eu.idura.verify.eid.Mock
 import eu.idura.verify.eid.NorwegianBankID
 import eu.idura.verify.eid.SwedishBankID
+import eu.idura.verify.eid.Vipps
 import eu.idura.verifyexample.ui.LoginState
 import eu.idura.verifyexample.ui.LoginViewModel
 import eu.idura.verifyexample.ui.theme.IduraVerifyAndroidTheme
@@ -251,6 +253,24 @@ fun LoginScreen(
             onLogin?.invoke(NorwegianBankID.substantial())
           }, modifier = buttonModifier) {
             Text(text = "Login with NO BankID")
+          }
+
+          Button(onClick = {
+            onLogin?.invoke(Vipps().withEmail())
+          }, modifier = buttonModifier) {
+            Text(text = "Login with Vipps")
+          }
+          Button(onClick = {
+            onLogin?.invoke(
+              FrejaID
+                .extended()
+                .sign(
+                  "The message",
+                  "The title",
+                ).withDefaultAndFaceConfirmation(),
+            )
+          }, modifier = buttonModifier) {
+            Text(text = "Login with FrejaID")
           }
         }
       }
