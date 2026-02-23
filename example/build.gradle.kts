@@ -68,9 +68,9 @@ dependencies {
   implementation(exampleLibs.androidx.compose.ui.tooling.preview)
   implementation(exampleLibs.androidx.compose.material3)
 
-  // Replace this dependency to test your local version of the library
-  // implementation(project(":verify"))
-  implementation(exampleLibs.verify)
+  // Replace this dependency to test against the published version of the library
+  implementation(project(":verify"))
+  // implementation(exampleLibs.verify)
 
   androidTestImplementation(platform(exampleLibs.androidx.compose.bom))
   androidTestImplementation(exampleLibs.androidx.compose.ui.test.junit4)
