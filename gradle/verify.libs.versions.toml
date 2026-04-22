@@ -24,7 +24,6 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 
 opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetryBom" }
 opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api" }
-opentelemetry-extension-kotlin = { module = "io.opentelemetry:opentelemetry-extension-kotlin" }
 opentelemetry-sdk = { module = "io.opentelemetry:opentelemetry-sdk" }
 opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
 java-uuid-generator = { module = "com.fasterxml.uuid:java-uuid-generator", version.ref = "javaUuidGenerator" }
