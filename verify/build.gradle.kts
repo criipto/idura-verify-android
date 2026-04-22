@@ -103,6 +103,7 @@ dependencies {
   implementation(libraryLibs.opentelemetry.api)
   implementation(libraryLibs.opentelemetry.sdk)
   implementation(libraryLibs.opentelemetry.extension.kotlin)
+  implementation(libraryLibs.opentelemetry.exporter.otlp)
   implementation(libraryLibs.java.uuid.generator)
 
   testImplementation(libraryLibs.kotlinx.coroutines.test)
