@@ -139,7 +139,7 @@ class IduraVerify(
   private var customTabIntentLauncher:
     ActivityResultLauncher<Pair<AuthorizationManagementRequest, Uri>>
 
-  private val tracing = Tracing(domain, httpClient)
+  private val tracing = Tracing(domain)
   private val tracer =
     tracing.getTracer(BuildConfig.LIBRARY_PACKAGE_NAME, BuildConfig.VERSION)
 

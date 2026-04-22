@@ -1,16 +1,9 @@
 package eu.idura.verify
 
 import android.os.Build
-import android.util.Log
 import com.fasterxml.uuid.Generators
-import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.SpanBuilder
 import io.opentelemetry.api.trace.StatusCode
@@ -19,113 +12,12 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.Context
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.context.propagation.TextMapSetter
-import io.opentelemetry.sdk.common.CompletableResultCode
+import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter
 import io.opentelemetry.sdk.resources.Resource
 import io.opentelemetry.sdk.trace.IdGenerator
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
-import io.opentelemetry.sdk.trace.export.SpanExporter
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import java.util.UUID
-
-@Serializable
-private data class IduraSpan(
-  val context: Map<String, String>,
-  val attributes: Map<String, String>,
-  val name: String,
-  val startTime: Long,
-  val endTime: Long,
-  val parentId: String,
-  val spanKind: String,
-  val status: String,
-)
-
-private fun nanosToMs(nanos: Long): Long = nanos / 1_000_000
-
-private fun String.upperFirst() =
-  this
-    .lowercase()
-    .replaceFirstChar { it.uppercase() }
-
-private class HeimdalExporter(
-  private val endpoint: String,
-  private val client: HttpClient,
-) : SpanExporter {
-  private val errorMessageAttribute =
-    AttributeKey
-      .stringKey("error.message")
-  private val durationAttribute =
-    AttributeKey
-      .stringKey("_duration")
-
-  override fun export(spans: Collection<SpanData?>): CompletableResultCode {
-    val resultCode = CompletableResultCode()
-
-    CoroutineScope(Dispatchers.Default).launch {
-      val response =
-        client.post(endpoint) {
-          contentType(ContentType.Application.Json)
-          setBody(
-            spans.filter { it != null }.map { spanData ->
-              var attributes =
-                spanData!!
-                  .attributes
-                  .asMap()
-                  .plus(
-                    mapOf(
-                      durationAttribute to
-                        nanosToMs(spanData.endEpochNanos - spanData.startEpochNanos),
-                    ),
-                  ).plus(spanData.resource.attributes.asMap())
-
-              if (spanData.status.statusCode === StatusCode.ERROR &&
-                !spanData.status.description.isEmpty()
-              ) {
-                attributes =
-                  attributes.plus(
-                    mapOf(errorMessageAttribute to spanData.status.description),
-                  )
-              }
-
-              IduraSpan(
-                name = spanData.name,
-                startTime = nanosToMs(spanData.startEpochNanos),
-                endTime = nanosToMs(spanData.endEpochNanos),
-                context = mapOf("spanId" to spanData.spanId, "traceId" to spanData.traceId),
-                parentId = spanData.parentSpanId,
-                spanKind = spanData.kind.toString().upperFirst(),
-                attributes =
-                  attributes
-                    .mapKeys { it.key.toString() }
-                    .mapValues { it.value.toString() },
-                status =
-                  spanData.status.statusCode
-                    .toString()
-                    .upperFirst(),
-              )
-            },
-          )
-        }
-
-      if (response.status.value in 200..299) {
-        resultCode.succeed()
-      } else {
-        resultCode.fail()
-      }
-      Log.d(TAG, "Metrics export complete")
-    }
-
-    return resultCode
-  }
-
-  override fun flush(): CompletableResultCode? = CompletableResultCode.ofSuccess()
-
-  override fun shutdown(): CompletableResultCode? = CompletableResultCode.ofSuccess()
-}
 
 private class IduraIdGenerator : IdGenerator {
   private val uuidV7Generator =
@@ -145,7 +37,6 @@ private class IduraIdGenerator : IdGenerator {
 
 internal class Tracing(
   serverAddress: String,
-  client: HttpClient,
 ) {
   private val tracerProvider =
     SdkTracerProvider
@@ -174,7 +65,11 @@ internal class Tracing(
       ).addSpanProcessor(
         BatchSpanProcessor
           .builder(
-            HeimdalExporter("https://telemetry.svc.criipto.com/v1/trace", client),
+            OtlpHttpSpanExporter
+              .builder()
+              .setEndpoint(
+                "https://telemetry.idura.app/v1/traces",
+              ).build(),
           ).build(),
       ).build()
 
