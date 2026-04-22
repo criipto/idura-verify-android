@@ -155,10 +155,10 @@ class IduraVerify(
       throw Exception("redirectUri must be HTTPS URIs")
     }
 
-    if (activity.lifecycle.currentState != Lifecycle.State.INITIALIZED) {
-      // We cannot register activity result handlers once the activity has been created, so better to fail early and explicitly
+    if (activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+      // We cannot register activity result handlers once the activity has been started, so better to fail early and explicitly
       throw IllegalStateException(
-        "Activity must be in ${Lifecycle.State.INITIALIZED.name} state, was ${activity.lifecycle.currentState.name}",
+        "IduraVerify must be instantiated before the activity reaches STARTED, was ${activity.lifecycle.currentState.name}",
       )
     }
 
