@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package eu.idura.verify.eid
 
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class Mock : EID<Mock>(acrValue = "urn:grn:authn:mock") {
   override fun getThis(): Mock = this
