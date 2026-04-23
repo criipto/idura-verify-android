@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package eu.idura.verify.eid
 
 import eu.idura.verify.Action
 import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 sealed class EID<T : EID<T>>(
   acrValue: String,
@@ -39,4 +42,21 @@ sealed class EID<T : EID<T>>(
 
   internal val acrValue: String
     get() = acrValues.joinToString(":")
+
+  /**
+   * Whether this eID's login supports an app-switch redirection back to the consumer app.
+   *
+   * Derived from the `acrValue` prefix so that `Other("urn:grn:authn:dk:mitid:substantial")`
+   * and the same value arrived at via `DanishMitID.substantial()` behave identically. Subclasses
+   * can override if they ever need to disagree with the prefix-based default, but the intended
+   * extension point is the [APP_SWITCH_ACR_PREFIXES] list below.
+   */
+  internal open val supportsAppSwitch: Boolean
+    get() = APP_SWITCH_ACR_PREFIXES.any { acrValue.startsWith(it) }
 }
+
+private val APP_SWITCH_ACR_PREFIXES =
+  listOf(
+    "urn:grn:authn:dk:mitid",
+    "urn:grn:authn:se:frejaid",
+  )

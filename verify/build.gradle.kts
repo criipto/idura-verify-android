@@ -2,7 +2,7 @@ plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.maven.publish)
-  kotlin("plugin.serialization") version "2.2.20"
+  kotlin("plugin.serialization") version "2.1.20"
 }
 
 var version = providers.gradleProperty("version").get()
@@ -18,9 +18,7 @@ android {
   }
 
   namespace = "eu.idura.verify"
-  compileSdk {
-    version = release(36)
-  }
+  compileSdk = 36
 
   defaultConfig {
     minSdk = 29
@@ -102,8 +100,8 @@ dependencies {
   implementation(platform(libraryLibs.opentelemetry.bom))
   implementation(libraryLibs.opentelemetry.api)
   implementation(libraryLibs.opentelemetry.sdk)
-  implementation(libraryLibs.opentelemetry.extension.kotlin)
   implementation(libraryLibs.opentelemetry.exporter.otlp)
+
   implementation(libraryLibs.java.uuid.generator)
 
   testImplementation(libraryLibs.kotlinx.coroutines.test)

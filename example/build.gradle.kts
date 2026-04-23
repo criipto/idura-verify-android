@@ -2,7 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
-  kotlin("plugin.serialization") version "2.2.20"
+  kotlin("plugin.serialization") version "2.1.20"
 }
 
 android {
@@ -10,9 +10,7 @@ android {
     buildConfig = true
   }
   namespace = "eu.idura.verifyexample"
-  compileSdk {
-    version = release(36)
-  }
+  compileSdk = 36
 
   val iduraDomain = providers.gradleProperty("iduraDomain").get()
   val iduraClientId = providers.gradleProperty("iduraClientId").get()

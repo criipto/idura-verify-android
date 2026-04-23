@@ -4,7 +4,7 @@ The Idura Verify Android SDK allows your users to authenticate with a host of Eu
 
 In addition to the basic OIDC flow, the SDK also supports [app switching](https://docs.idura.com/verify/guides/appswitch/) for the Danish MitID app.
 
-This project is built using Kotlin, and targets Android API Level 29 and up. It builds on top of the [AppAuth library](https://github.com/openid/AppAuth-android), which is maintained by the OpenID foundation. It has been tested on Android versions 10 through 16, using Chrome (both Auth Tab and Custom Tab), Samsung Internet, Brave, and Microsoft Edge browsers.
+This project is built using Kotlin, and targets Android API Level 29 and up. The published artifact is compiled against Kotlin 2.1.20 and AGP 8.11, so consumer projects on those versions or newer — e.g. React Native 0.81+ / Expo SDK 54+ — can link against it without metadata-version or composite-build compatibility conflicts. It builds on top of the [AppAuth library](https://github.com/openid/AppAuth-android), which is maintained by the OpenID foundation. It has been tested on Android versions 10 through 16, using Chrome (both Auth Tab and Custom Tab), Samsung Internet, Brave, and Microsoft Edge browsers.
 
 If the end-user has one of the browsers above installed, the SDK will use that, even if it is not the default browser. If not, the SDK will fall back to the default browser. 
 The SDK _can_ work with other browsers (such as Opera and Firefox). However, the end user will need to manually press "Open in app" after being redirected to the redirect URL.

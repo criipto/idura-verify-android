@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package eu.idura.verify.eid
 
 import eu.idura.verify.Action
 import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 abstract class FrejaID<T : FrejaID<T>> internal constructor(
   minRegistrationLevel: String,

@@ -3,7 +3,7 @@ appcompat = "1.7.1"
 appauth = "0.11.1"
 jwksRsa = "0.23.0"
 javaJwt = "4.5.0"
-ktor = "3.3.1"
+ktor = "3.2.3"
 javaUuidGenerator = "5.1.1"
 opentelemetryBom = "1.55.0"
 browser = "1.9.0"
@@ -24,7 +24,6 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 
 opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetryBom" }
 opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api" }
-opentelemetry-extension-kotlin = { module = "io.opentelemetry:opentelemetry-extension-kotlin" }
 opentelemetry-sdk = { module = "io.opentelemetry:opentelemetry-sdk" }
 opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
 java-uuid-generator = { module = "com.fasterxml.uuid:java-uuid-generator", version.ref = "javaUuidGenerator" }
