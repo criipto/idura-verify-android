@@ -29,6 +29,9 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.idura.verify.eid.AgeVerification
+import eu.idura.verify.eid.AgeVerificationAge
+import eu.idura.verify.eid.AgeVerificationCountry
 import eu.idura.verify.eid.DanishMitID
 import eu.idura.verify.eid.EID
 import eu.idura.verify.eid.FrejaID
@@ -271,6 +274,17 @@ fun LoginScreen(
             )
           }, modifier = buttonModifier) {
             Text(text = "Login with FrejaID")
+          }
+
+          Button(onClick = {
+            onLogin?.invoke(
+              AgeVerification
+                .over(AgeVerificationAge.Over15)
+                .over(AgeVerificationAge.Over18)
+                .withCountry(AgeVerificationCountry.Denmark),
+            )
+          }, modifier = buttonModifier) {
+            Text(text = "Age verification (over 15 and 18)")
           }
         }
       }
