@@ -1,12 +1,12 @@
 # idura-verify-android
 
-The Idura Verify Android SDK allows your users to authenticate with a host of European eID providers. It allows your application to act as a [_public client_](https://docs.idura.com/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.com/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
+The Idura Verify Android SDK allows your users to authenticate with a host of European eID providers. It allows your application to act as a [_public client_](https://docs.idura.app/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.app/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
 
-In addition to the basic OIDC flow, the SDK also supports [app switching](https://docs.idura.com/verify/guides/appswitch/) for the Danish MitID app.
+In addition to the basic OIDC flow, the SDK also supports [app switching](https://docs.idura.app/verify/guides/appswitch/) for the Danish MitID app.
 
 This project is built using Kotlin, and targets Android API Level 29 and up. The published artifact is compiled against Kotlin 2.1.20 and AGP 8.11, so consumer projects on those versions or newer — e.g. React Native 0.81+ / Expo SDK 54+ — can link against it without metadata-version or composite-build compatibility conflicts. It builds on top of the [AppAuth library](https://github.com/openid/AppAuth-android), which is maintained by the OpenID foundation. It has been tested on Android versions 10 through 16, using Chrome (both Auth Tab and Custom Tab), Samsung Internet, Brave, and Microsoft Edge browsers.
 
-If the end-user has one of the browsers above installed, the SDK will use that, even if it is not the default browser. If not, the SDK will fall back to the default browser. 
+If the end-user has one of the browsers above installed, the SDK will use that, even if it is not the default browser. If not, the SDK will fall back to the default browser.
 The SDK _can_ work with other browsers (such as Opera and Firefox). However, the end user will need to manually press "Open in app" after being redirected to the redirect URL.
 
 # Installation
@@ -30,10 +30,10 @@ The SDK needs to be configured with two pieces of information:
 
 The SDK assumes that:
 
-- You will be using your [Idura domain](https://docs.idura.com/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
+- You will be using your [Idura domain](https://docs.idura.app/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
 - Your redirect URL will be `https://[YOUR IDURA DOMAIN]/android/callback`.
 
-You should register the callback URL in the [Idura dashboard](https://dashboard.idura.com). To override these values, see the [Customization section](#customization).
+You should register the callback URL in the [Idura dashboard](https://dashboard.idura.app). To override these values, see the [Customization section](#customization).
 
 The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and app switch URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest)
 
