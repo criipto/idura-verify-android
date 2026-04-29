@@ -669,20 +669,26 @@ class IduraVerify(
     }
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 internal fun <T> cacheResult(
   scope: CoroutineScope,
   load: suspend () -> T,
 ): suspend () -> T {
   var cachedDeferred: Deferred<T>? = null
   return {
-    // If there is currently no cached deferred, or if the current cached deferred has failed, create a new one
-    if (cachedDeferred == null || cachedDeferred?.isCancelled == true) {
-      cachedDeferred =
-        scope.async {
-          load()
-        }
-    }
-
-    cachedDeferred.await()
+    // Reuse the cached deferred unless it has completed with an exception. Checking
+    // `isCancelled` alone would only retry when the scope's job is a SupervisorJob
+    // (so async failures cancel just the child); with a regular Job the failed
+    // deferred would not appear cancelled and we would never retry.
+    val existing = cachedDeferred
+    val deferred =
+      if (existing == null ||
+        (existing.isCompleted && existing.getCompletionExceptionOrNull() != null)
+      ) {
+        scope.async { load() }.also { cachedDeferred = it }
+      } else {
+        existing
+      }
+    deferred.await()
   }
 }
