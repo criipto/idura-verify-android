@@ -407,11 +407,7 @@ class IduraVerify(
         }
 
         val loginHints =
-          (
-            mutableSetOf(
-              "mobile:continue_button:never",
-            ) + eid.loginHints
-          ) as MutableSet<String>
+          mutableSetOf("mobile:continue_button:never").apply { addAll(eid.loginHints) }
 
         if (eid.supportsAppSwitch) {
           loginHints.add("appswitch:android")
