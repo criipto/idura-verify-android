@@ -25,11 +25,13 @@ import io.ktor.client.request.forms.submitForm
 import io.ktor.http.parametersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.opentelemetry.api.trace.Span
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import net.openid.appauth.AppAuthConfiguration
@@ -50,7 +52,6 @@ import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
 import java.security.interfaces.RSAPublicKey
-import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -608,8 +609,13 @@ class IduraVerify(
 
   /**
    * The continuation that should be invoked when control returns from the browser to this library.
+   *
+   * Only one browser flow can be in flight at a time: the activity result handlers have no way to
+   * tell which of several pending continuations a given callback belongs to. [launchBrowser]
+   * rejects calls that would overlap, and the field is cleared in [launchBrowser]'s `finally`
+   * block on resume, exception, and cancellation so the slot is reusable.
    */
-  private var browserFlowContinuation: Continuation<Uri>? = null
+  private var browserFlowContinuation: CancellableContinuation<Uri>? = null
 
   private suspend fun launchBrowser(
     request: AuthorizationManagementRequest,
@@ -621,26 +627,33 @@ class IduraVerify(
       .setAttribute("browser", browserDescription)
       .withSpanContext(span)
       .startAndRun {
-        suspendCoroutine { continuation ->
-          browserFlowContinuation = continuation
+        check(browserFlowContinuation == null) {
+          "Another browser flow is already in progress"
+        }
+        try {
+          suspendCancellableCoroutine { continuation ->
+            browserFlowContinuation = continuation
 
-          if (tabType == TabType.AuthTab) {
-            // Open the Authorization URI in an Auth Tab if supported by chrome
-            val authTabIntent = AuthTabIntent.Builder().build()
+            if (tabType == TabType.AuthTab) {
+              // Open the Authorization URI in an Auth Tab if supported by chrome
+              val authTabIntent = AuthTabIntent.Builder().build()
 
-            // Auth tab will use the default browser, but we force it to use chrome.
-            // In the future, other browser _could_ support the auth tab API (like they support custom tabs). But at the time of writing, only chrome supports it.
-            authTabIntent.intent.`package` = Browsers.Chrome.PACKAGE_NAME
-            authTabIntent.launch(
-              authTabIntentLauncher,
-              uri,
-              redirectUri.host!!,
-              redirectUri.path!!,
-            )
-          } else {
-            // Fall back to a Custom Tab.
-            customTabIntentLauncher.launch(Pair(request, uri))
+              // Auth tab will use the default browser, but we force it to use chrome.
+              // In the future, other browser _could_ support the auth tab API (like they support custom tabs). But at the time of writing, only chrome supports it.
+              authTabIntent.intent.`package` = Browsers.Chrome.PACKAGE_NAME
+              authTabIntent.launch(
+                authTabIntentLauncher,
+                uri,
+                redirectUri.host!!,
+                redirectUri.path!!,
+              )
+            } else {
+              // Fall back to a Custom Tab.
+              customTabIntentLauncher.launch(Pair(request, uri))
+            }
           }
+        } finally {
+          browserFlowContinuation = null
         }
       }
 
