@@ -283,8 +283,8 @@ class IduraVerify(
           listOf(
             Pair(Browsers.Chrome.PACKAGE_NAME, VersionedBrowserMatcher.CHROME_CUSTOM_TAB),
             Pair(Browsers.SBrowser.PACKAGE_NAME, VersionedBrowserMatcher.SAMSUNG_CUSTOM_TAB),
-            Pair(BRAVE, BrowserMatcher { it.packageName === BRAVE }),
-            Pair(EDGE, BrowserMatcher { it.packageName === EDGE }),
+            Pair(BRAVE, BrowserMatcher { it.packageName == BRAVE }),
+            Pair(EDGE, BrowserMatcher { it.packageName == EDGE }),
           ).find {
             // Find the first of our preferred browsers, which is able to open a custom tab.
             CustomTabsClient.getPackageName(
