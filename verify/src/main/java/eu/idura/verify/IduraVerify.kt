@@ -140,7 +140,7 @@ class IduraVerify(
   private val tracer =
     tracing.getTracer(BuildConfig.LIBRARY_PACKAGE_NAME, BuildConfig.VERSION)
 
-  private lateinit var browserDescription: String
+  private var browserDescription: String? = null
   private val getIduraJWKS = cacheResult(activity.lifecycleScope, this::loadIduraJWKS)
   private val getIduraOIDCConfiguration =
     cacheResult(activity.lifecycleScope, this::loadIduraOIDCConfiguration)
@@ -614,7 +614,7 @@ class IduraVerify(
   ): Uri =
     tracer
       .spanBuilder("launch browser")
-      .setAttribute("browser", browserDescription)
+      .setAttribute("browser", browserDescription ?: "unknown")
       .withSpanContext(span)
       .startAndRun {
         browserFlowSlot.run {
