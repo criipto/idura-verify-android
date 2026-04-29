@@ -50,7 +50,6 @@ import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
 import java.security.interfaces.RSAPublicKey
-import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -332,9 +331,9 @@ class IduraVerify(
     httpClient.close()
   }
 
-  private fun handleResultUri(uri: Uri) = browserFlowContinuation?.resume(uri)
+  private fun handleResultUri(uri: Uri) = browserFlowSlot.resume(uri)
 
-  private fun handleException(ex: Exception) = browserFlowContinuation?.resumeWithException(ex)
+  private fun handleException(ex: Exception) = browserFlowSlot.fail(ex)
 
   private fun handleCustomTabResult(result: CustomTabResult) {
     Log.i(TAG, "Handling custom tab result $result")
@@ -606,10 +605,7 @@ class IduraVerify(
       ).build()
   }
 
-  /**
-   * The continuation that should be invoked when control returns from the browser to this library.
-   */
-  private var browserFlowContinuation: Continuation<Uri>? = null
+  private val browserFlowSlot = BrowserFlowSlot<Uri>()
 
   private suspend fun launchBrowser(
     request: AuthorizationManagementRequest,
@@ -621,9 +617,7 @@ class IduraVerify(
       .setAttribute("browser", browserDescription)
       .withSpanContext(span)
       .startAndRun {
-        suspendCoroutine { continuation ->
-          browserFlowContinuation = continuation
-
+        browserFlowSlot.run {
           if (tabType == TabType.AuthTab) {
             // Open the Authorization URI in an Auth Tab if supported by chrome
             val authTabIntent = AuthTabIntent.Builder().build()
