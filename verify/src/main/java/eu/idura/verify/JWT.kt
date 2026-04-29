@@ -11,7 +11,7 @@ class JWT(
 
   val subject: String = decodedJWT.subject
 
-  val audience: String = decodedJWT.audience[0]
+  val audience: String? = decodedJWT.audience.firstOrNull()
 
   val issuer: String = decodedJWT.issuer
 
