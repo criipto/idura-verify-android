@@ -16,6 +16,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.exceptions.JWTVerificationException
 import eu.idura.verify.eid.EID
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -491,26 +492,29 @@ class IduraVerify(
 
     return tracer.spanBuilder("JWT verification").withSpanContext(span).startAndRun {
       val idToken = tokenResponse.idToken!!
-      val decodedJWT = Auth0JWT.decode(idToken)
+      try {
+        val decodedJWT = Auth0JWT.decode(idToken)
 
-      val keyId = decodedJWT.getHeaderClaim("kid").asString()
-      val key = getIduraJWKS().find { it.id == keyId }
+        val keyId = decodedJWT.getHeaderClaim("kid").asString()
+        val key =
+          getIduraJWKS().find { it.id == keyId }
+            ?: throw IduraVerifyInternalException("Unknown JWT signing key: $keyId")
 
-      if (key == null) {
-        throw IduraVerifyInternalException("Unknown JWT signing key: $keyId")
-      }
-
-      val algorithm = Algorithm.RSA256(key.publicKey as RSAPublicKey)
-      val verifier =
+        val algorithm = Algorithm.RSA256(key.publicKey as RSAPublicKey)
         Auth0JWT
           .require(algorithm)
           .withIssuer("https://$domain")
+          // Require `aud` to contain our client_id (OIDC Core 1.0 §3.1.3.7). This also
+          // guarantees `decodedJWT.audience` is non-empty when constructing `JWT` below.
+          .withAudience(clientID)
           // Add five minutes of leeway when validating nbf and iat.
           .acceptLeeway(5.minutes.inWholeSeconds)
           .build()
-
-      verifier.verify(idToken)
-      return@startAndRun JWT(decodedJWT)
+          .verify(idToken)
+        return@startAndRun JWT(decodedJWT)
+      } catch (e: JWTVerificationException) {
+        throw IduraVerifyInternalException("ID token verification failed", cause = e)
+      }
     }
   }
 
