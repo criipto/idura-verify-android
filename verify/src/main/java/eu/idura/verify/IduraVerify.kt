@@ -96,8 +96,6 @@ enum class Action {
   Sign,
 }
 
-class NoSuitableBrowserException : Exception("No suitable browsers found")
-
 class IduraVerify(
   private val clientID: String,
   private val domain: String,
@@ -148,8 +146,8 @@ class IduraVerify(
   private var foundASuitableBrowser = false
 
   init {
-    if (redirectUri.scheme != "https") {
-      throw Exception("redirectUri must be HTTPS URIs")
+    require(redirectUri.scheme == "https") {
+      "redirectUri must use https scheme"
     }
 
     if (activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
@@ -200,7 +198,9 @@ class IduraVerify(
               }
 
               else -> {
-                throw Exception("Unsupported request type $input")
+                throw IduraVerifyInternalException(
+                  "Unsupported request type: ${request::class.simpleName}",
+                )
               }
             }
           }
@@ -339,7 +339,7 @@ class IduraVerify(
     Log.i(TAG, "Handling custom tab result $result")
 
     when (result) {
-      is CustomTabResult.CustomTabFailure -> handleException(result.ex)
+      is CustomTabResult.CustomTabFailure -> handleException(result.ex.toIduraVerifyException())
       is CustomTabResult.CustomTabSuccess -> handleResultUri(result.resultUri)
     }
   }
@@ -353,23 +353,19 @@ class IduraVerify(
       }
 
       AuthTabIntent.RESULT_CANCELED -> {
-        handleException(Exception("RESULT_CANCELED"))
+        handleException(UserCancelledException())
       }
 
       AuthTabIntent.RESULT_UNKNOWN_CODE -> {
-        handleException(Exception("RESULT_UNKNOWN_CODE"))
+        handleException(IduraVerifyInternalException("Auth Tab returned unknown code"))
       }
 
       AuthTabIntent.RESULT_VERIFICATION_FAILED -> {
-        handleException(
-          Exception("RESULT_VERIFICATION_FAILED"),
-        )
+        handleException(IduraVerifyInternalException("Auth Tab verification failed"))
       }
 
       AuthTabIntent.RESULT_VERIFICATION_TIMED_OUT -> {
-        handleException(
-          Exception("RESULT_VERIFICATION_TIMED_OUT"),
-        )
+        handleException(IduraVerifyInternalException("Auth Tab verification timed out"))
       }
     }
   }
@@ -444,7 +440,16 @@ class IduraVerify(
         if (callbackUri.getQueryParameter("code") != null) {
           return@startAndRun exchangeCode(authorizationRequest, callbackUri, span)
         } else {
-          throw Exception("OIDC flow returned error: ${callbackUri.getQueryParameter("error")}")
+          val error = callbackUri.getQueryParameter("error") ?: "unknown_error"
+          val errorDescription = callbackUri.getQueryParameter("error_description")
+          // OAuth 2.0's `access_denied` is the spec-standard signal that the user
+          // declined the request at the IdP. Surface it as cancellation so consumers
+          // only have to handle one cancellation type across the various paths.
+          throw if (error == "access_denied") {
+            UserCancelledException()
+          } else {
+            OAuthException(error = error, errorDescription = errorDescription)
+          }
         }
       }
 
@@ -466,7 +471,7 @@ class IduraVerify(
               .build()
 
           if (!validateState(request, response)) {
-            throw Exception("State mismatch")
+            throw IduraVerifyInternalException("State mismatch in OIDC response")
           }
 
           suspendCoroutine { continuation ->
@@ -474,7 +479,7 @@ class IduraVerify(
               response.createTokenExchangeRequest(),
             ) { tokenResponse, ex ->
               if (ex != null) {
-                continuation.resumeWithException(ex)
+                continuation.resumeWithException(ex.toIduraVerifyException())
               } else {
                 // From TokenResponseCallback - Exactly one of `response` or `ex` will be non-null. So
                 // when we reach this line, we know that response is not null.
@@ -492,7 +497,7 @@ class IduraVerify(
       val key = getIduraJWKS().find { it.id == keyId }
 
       if (key == null) {
-        throw Exception("Unknown key $keyId")
+        throw IduraVerifyInternalException("Unknown JWT signing key: $keyId")
       }
 
       val algorithm = Algorithm.RSA256(key.publicKey as RSAPublicKey)
@@ -583,8 +588,8 @@ class IduraVerify(
       }
 
     if (response.status.value != 201) {
-      throw Error(
-        "Error during PAR request ${response.status.value} ${response.status.description}",
+      throw IduraVerifyInternalException(
+        "PAR request failed: ${response.status.value} ${response.status.description}",
       )
     }
 

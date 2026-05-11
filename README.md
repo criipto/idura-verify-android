@@ -116,6 +116,35 @@ The returned JWT class has properties for some common claims such as `subject` a
 val streetAddress = jwt.getClaimAsMap("address")?.get("street_address") as? String
 ```
 
+## Error handling
+
+`IduraVerify.login()` throws `IduraVerifyException` for any runtime failure, with concrete subclasses you can pattern-match on:
+
+```kt
+import eu.idura.verify.IduraVerifyException
+import eu.idura.verify.NoSuitableBrowserException
+import eu.idura.verify.OAuthException
+import eu.idura.verify.UserCancelledException
+
+try {
+  val jwt = iduraVerify.login(DanishMitID.substantial())
+  // ...
+} catch (ex: UserCancelledException) {
+  // User dismissed the browser tab or the IdP returned `access_denied`. Usually a normal
+  // action — quietly return them to the previous screen rather than showing an error.
+} catch (ex: NoSuitableBrowserException) {
+  // No browser on the device can run the auth flow.
+} catch (ex: OAuthException) {
+  // The IdP returned a non-cancellation OAuth error. `ex.error` is the OAuth 2.0 error code,
+  // `ex.errorDescription` is the optional human-readable text.
+} catch (ex: IduraVerifyException) {
+  // Catch-all for SDK-internal failures (PAR, JWT verification, browser plumbing). Treat
+  // as unrecoverable; surface a generic error to the user and log the cause.
+}
+```
+
+Programming errors detected during construction (HTTPS-only redirect URI, lifecycle precondition) throw the standard `IllegalArgumentException` / `IllegalStateException` rather than `IduraVerifyException` — they indicate caller bugs, not runtime conditions.
+
 # Customization
 
 ## Using a custom callback domain
