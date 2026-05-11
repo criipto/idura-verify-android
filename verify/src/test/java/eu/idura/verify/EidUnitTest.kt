@@ -1,6 +1,7 @@
 package eu.idura.verify
 
 import eu.idura.verify.eid.DanishMitID
+import eu.idura.verify.eid.FrejaID
 import eu.idura.verify.eid.Other
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -31,5 +32,26 @@ class EidUnitTest {
 
     assertEquals(other.acrValue, acrValue)
     assertEquals(other.scopes.toList(), listOf("something"))
+  }
+
+  @Test
+  fun frejaid_basic_min_registration_level() {
+    val freja = FrejaID.basic()
+
+    assertEquals(listOf("minregistrationlevel:basic"), freja.loginHints.toList())
+  }
+
+  @Test
+  fun frejaid_extended_min_registration_level() {
+    val freja = FrejaID.extended()
+
+    assertEquals(listOf("minregistrationlevel:extended"), freja.loginHints.toList())
+  }
+
+  @Test
+  fun frejaid_plus_min_registration_level() {
+    val freja = FrejaID.plus()
+
+    assertEquals(listOf("minregistrationlevel:plus"), freja.loginHints.toList())
   }
 }

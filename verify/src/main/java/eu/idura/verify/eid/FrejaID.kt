@@ -50,10 +50,6 @@ class FrejaIDBasic internal constructor(
 class FrejaIDExtendedOrPlus internal constructor(
   minRegistrationLevel: String,
 ) : FrejaID<FrejaIDExtendedOrPlus>(minRegistrationLevel) {
-  init {
-    this.withLoginHint("minregistrationlevel:extended")
-  }
-
   override fun getThis(): FrejaIDExtendedOrPlus = this
 
   fun withBasicUserInfo() = this.withScope("frejaid:basic_user_info")
