@@ -17,7 +17,7 @@ android {
 
   defaultConfig {
     applicationId = "eu.idura.verifyexample"
-    minSdk = 29
+    minSdk = 26
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
