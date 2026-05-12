@@ -2,7 +2,7 @@ plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.maven.publish)
-  kotlin("plugin.serialization") version "2.1.20"
+  kotlin("plugin.serialization") version "2.1.21"
 }
 
 var version = providers.gradleProperty("version").get()

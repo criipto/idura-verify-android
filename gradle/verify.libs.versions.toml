@@ -1,12 +1,12 @@
 [versions]
 appcompat = "1.7.1"
 appauth = "0.11.1"
-jwksRsa = "0.23.0"
-javaJwt = "4.5.0"
-ktor = "3.2.3"
+jwksRsa = "0.24.0"
+javaJwt = "4.5.2"
+ktor = "3.2.4"
 javaUuidGenerator = "5.1.1"
 opentelemetryBom = "1.55.0"
-browser = "1.9.0"
+browser = "1.10.0"
 kotlinxCoroutinesTest = "1.10.2"
 
 [libraries]
