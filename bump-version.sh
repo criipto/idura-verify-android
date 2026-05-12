@@ -23,7 +23,7 @@ fi
 
 # validate the version argument
 case "$1" in
-    major|minor|patch)
+    major|minor|patch|premajor|preminor|prepatch)
         ;;
     *)  echo "Invalid version bump argument provided. Usage ./bump-versions.sh <major | minor | patch>"
         exit 1
@@ -44,7 +44,7 @@ then
   exit 1
 fi
 
-newVersion=$(semver "$currentVersion" --increment "$1")
+newVersion=$(semver "$currentVersion" --preid beta --increment "$1")
 sed -i '' "s/$currentVersion/$newVersion/g" gradle.properties
 
 echo "Bumping to $newVersion"
