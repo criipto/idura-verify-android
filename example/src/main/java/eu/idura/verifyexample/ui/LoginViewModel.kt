@@ -51,7 +51,7 @@ class LoginViewModel(
     viewModelScope.launch {
       _uiState.update { LoginState.Loading() }
       try {
-        val jwt = iduraVerify.login(eid)
+        val jwt = iduraVerify.login(eid).jwt
 
         _uiState.update {
           LoginState.LoggedIn(

@@ -372,85 +372,92 @@ class IduraVerify(
   }
 
   /**
-   * Start a login, returning the JWT as a string once the flow is complete.
+   * Start a login, returning the verified ID token and the trace ID for the login flow.
    *
    * The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method.
    *
    * @param eid The eID to login with.
    * @param prompt The OIDC prompt, see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
    *
-   * @return The JWT as a string.
+   * @return A [LoginResult] containing the verified JWT and the OpenTelemetry trace ID for the
+   *   login flow. On failure, an [IduraVerifyException] is thrown with the trace ID available
+   *   on [IduraVerifyException.traceId].
    *
    * @sample eu.idura.verify.samples.loginSample1
    */
   suspend fun login(
     eid: EID<*>,
     prompt: Prompt? = null,
-  ): JWT =
+  ): LoginResult =
     tracer
       .spanBuilder(
         "android sdk login",
       ).setAttribute("acr_value", eid.acrValue)
       .setNoParent()
       .startAndRun { span ->
-        Log.i(
-          TAG,
-          "Starting login with ${eid.acrValue}, traceId ${span.spanContext.traceId}",
-        )
+        val traceId = span.spanContext.traceId
 
-        if (!foundASuitableBrowser) {
-          throw NoSuitableBrowserException()
-        }
-
-        val loginHints =
-          mutableSetOf("mobile:continue_button:never").apply { addAll(eid.loginHints) }
-
-        if (eid.supportsAppSwitch) {
-          loginHints.add("appswitch:android")
-          loginHints.add(
-            "appswitch:resumeUrl:${redirectUri.buildUpon().appendQueryParameter(
-              APPSWITCH_QUERY_PARAM,
-              null,
-            ).build()}",
-          )
-        }
-
-        val scopes = eid.scopes + listOf("openid")
-
-        if (eid.action != null) {
-          loginHints.add("action:${eid.action!!.name.lowercase()}")
-        }
-
-        val authorizationRequest =
-          AuthorizationRequest
-            .Builder(
-              getIduraOIDCConfiguration(),
-              clientID,
-              ResponseTypeValues.CODE,
-              redirectUri,
-            ).setScope(scopes.joinToString(" "))
-            .setAdditionalParameters(mapOf("acr_values" to eid.acrValue))
-            .setLoginHint(loginHints.joinToString(" "))
-            .setPrompt(prompt?.str)
-            .build()
-
-        val parRequestUri = pushAuthorizationRequest(authorizationRequest, span)
-
-        val callbackUri = launchBrowser(authorizationRequest, parRequestUri, span)
-
-        if (callbackUri.getQueryParameter("code") != null) {
-          return@startAndRun exchangeCode(authorizationRequest, callbackUri, span)
-        } else {
-          val error = callbackUri.getQueryParameter("error") ?: "unknown_error"
-          val errorDescription = callbackUri.getQueryParameter("error_description")
-          // OAuth 2.0's `access_denied` is the spec-standard signal that the user
-          // declined the request at the IdP. Surface it as cancellation so consumers
-          // only have to handle one cancellation type across the various paths.
-          throw if (error == "access_denied") {
-            UserCancelledException()
-          } else {
-            OAuthException(error = error, errorDescription = errorDescription)
+        try {
+          if (!foundASuitableBrowser) {
+            throw NoSuitableBrowserException()
           }
+
+          val loginHints =
+            mutableSetOf("mobile:continue_button:never").apply { addAll(eid.loginHints) }
+
+          if (eid.supportsAppSwitch) {
+            loginHints.add("appswitch:android")
+            loginHints.add(
+              "appswitch:resumeUrl:${redirectUri.buildUpon().appendQueryParameter(
+                APPSWITCH_QUERY_PARAM,
+                null,
+              ).build()}",
+            )
+          }
+
+          val scopes = eid.scopes + listOf("openid")
+
+          if (eid.action != null) {
+            loginHints.add("action:${eid.action!!.name.lowercase()}")
+          }
+
+          val authorizationRequest =
+            AuthorizationRequest
+              .Builder(
+                getIduraOIDCConfiguration(),
+                clientID,
+                ResponseTypeValues.CODE,
+                redirectUri,
+              ).setScope(scopes.joinToString(" "))
+              .setAdditionalParameters(mapOf("acr_values" to eid.acrValue))
+              .setLoginHint(loginHints.joinToString(" "))
+              .setPrompt(prompt?.str)
+              .build()
+
+          val parRequestUri = pushAuthorizationRequest(authorizationRequest, span)
+
+          val callbackUri = launchBrowser(authorizationRequest, parRequestUri, span)
+
+          val jwt =
+            if (callbackUri.getQueryParameter("code") != null) {
+              exchangeCode(authorizationRequest, callbackUri, span)
+            } else {
+              val error = callbackUri.getQueryParameter("error") ?: "unknown_error"
+              val errorDescription = callbackUri.getQueryParameter("error_description")
+              // OAuth 2.0's `access_denied` is the spec-standard signal that the user
+              // declined the request at the IdP. Surface it as cancellation so consumers
+              // only have to handle one cancellation type across the various paths.
+              throw if (error == "access_denied") {
+                UserCancelledException()
+              } else {
+                OAuthException(error = error, errorDescription = errorDescription)
+              }
+            }
+
+          LoginResult(jwt = jwt, traceId = traceId)
+        } catch (ex: IduraVerifyException) {
+          ex.traceId = traceId
+          throw ex
         }
       }
 
@@ -538,26 +545,31 @@ class IduraVerify(
         "android sdk logout",
       ).setNoParent()
       .startAndRun { span ->
-        val endSessionRequest =
-          EndSessionRequest
-            .Builder(
-              getIduraOIDCConfiguration(),
-            ).setIdTokenHint(idToken)
-            .setPostLogoutRedirectUri(redirectUri)
-            .build()
+        try {
+          val endSessionRequest =
+            EndSessionRequest
+              .Builder(
+                getIduraOIDCConfiguration(),
+              ).setIdTokenHint(idToken)
+              .setPostLogoutRedirectUri(redirectUri)
+              .build()
 
-        val callbackUri = launchBrowser(endSessionRequest, endSessionRequest.toUri(), span)
+          val callbackUri = launchBrowser(endSessionRequest, endSessionRequest.toUri(), span)
 
-        val response =
-          EndSessionResponse
-            .Builder(endSessionRequest)
-            .setState(
-              callbackUri.getQueryParameter(
-                "state",
-              ),
-            ).build()
+          val response =
+            EndSessionResponse
+              .Builder(endSessionRequest)
+              .setState(
+                callbackUri.getQueryParameter(
+                  "state",
+                ),
+              ).build()
 
-        validateState(endSessionRequest, response)
+          validateState(endSessionRequest, response)
+        } catch (ex: IduraVerifyException) {
+          ex.traceId = span.spanContext.traceId
+          throw ex
+        }
       }
 
   /**

@@ -98,14 +98,17 @@ IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured f
 ## Logging in
 
 ```kt
-val jwt = iduraVerify.login(DanishMitID.substantial())
-println(jwt.subject)
+val result = iduraVerify.login(DanishMitID.substantial())
+println(result.jwt.subject)
+println(result.traceId)
 ```
+
+`login()` returns a `LoginResult` containing the verified `jwt` and the `traceId` for the login flow. You can inspect traces in the Idura dashboard.
 
 The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method:
 
 ```kt
-val jwt = iduraVerify.login(
+val result = iduraVerify.login(
   DanishMitID.substantial().prefillSsn("123456-7890").withMessage("Hello there!"),
 )
 ```
@@ -113,12 +116,12 @@ val jwt = iduraVerify.login(
 The returned JWT class has properties for some common claims such as `subject` and `identityscheme`. For other claims, use the `getClaimsAsString`, `getClaimAsMap` etc. functions. For example, if you requested the `address` scope, you can access the address like so:
 
 ```kt
-val streetAddress = jwt.getClaimAsMap("address")?.get("street_address") as? String
+val streetAddress = result.jwt.getClaimAsMap("address")?.get("street_address") as? String
 ```
 
 ## Error handling
 
-`IduraVerify.login()` throws `IduraVerifyException` for any runtime failure, with concrete subclasses you can pattern-match on:
+`IduraVerify.login()` throws `IduraVerifyException` for any runtime failure, with concrete subclasses you can pattern-match on. The trace ID of the failed flow is available on `ex.traceId`:
 
 ```kt
 import eu.idura.verify.IduraVerifyException
@@ -127,7 +130,7 @@ import eu.idura.verify.OAuthException
 import eu.idura.verify.UserCancelledException
 
 try {
-  val jwt = iduraVerify.login(DanishMitID.substantial())
+  val result = iduraVerify.login(DanishMitID.substantial())
   // ...
 } catch (ex: UserCancelledException) {
   // User dismissed the browser tab or the IdP returned `access_denied`. Usually a normal
@@ -140,6 +143,7 @@ try {
 } catch (ex: IduraVerifyException) {
   // Catch-all for SDK-internal failures (PAR, JWT verification, browser plumbing). Treat
   // as unrecoverable; surface a generic error to the user and log the cause.
+  // `ex.traceId` carries the trace ID.
 }
 ```
 
