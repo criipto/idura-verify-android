@@ -98,14 +98,16 @@ IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured f
 ## Logging in
 
 ```kt
-val jwt = iduraVerify.login(DanishMitID.substantial())
-println(jwt.subject)
+val result = iduraVerify.login(DanishMitID.substantial())
+println(result.jwt.subject)
 ```
+
+`login()` returns a `LoginResult` containing the verified `jwt`.
 
 The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method:
 
 ```kt
-val jwt = iduraVerify.login(
+val result = iduraVerify.login(
   DanishMitID.substantial().prefillSsn("123456-7890").withMessage("Hello there!"),
 )
 ```
@@ -113,7 +115,7 @@ val jwt = iduraVerify.login(
 The returned JWT class has properties for some common claims such as `subject` and `identityscheme`. For other claims, use the `getClaimsAsString`, `getClaimAsMap` etc. functions. For example, if you requested the `address` scope, you can access the address like so:
 
 ```kt
-val streetAddress = jwt.getClaimAsMap("address")?.get("street_address") as? String
+val streetAddress = result.jwt.getClaimAsMap("address")?.get("street_address") as? String
 ```
 
 ## Error handling
