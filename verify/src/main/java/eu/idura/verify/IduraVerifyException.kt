@@ -14,7 +14,15 @@ import net.openid.appauth.AuthorizationException
 abstract class IduraVerifyException(
   message: String,
   cause: Throwable? = null,
-) : Exception(message, cause)
+) : Exception(message, cause) {
+  /**
+   * OpenTelemetry trace ID of the SDK call that produced this exception, or `null` if the
+   * failure occurred before a span was started (e.g. construction-time checks). Pass this
+   * value to Idura support to correlate the failure with server-side telemetry.
+   */
+  var traceId: String? = null
+    internal set
+}
 
 /**
  * The user dismissed the authentication flow before it completed. This is usually a normal

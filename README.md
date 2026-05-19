@@ -100,9 +100,10 @@ IduraVerify   eu.idura.verifyexample  W   App link is not correctly configured f
 ```kt
 val result = iduraVerify.login(DanishMitID.substantial())
 println(result.jwt.subject)
+println(result.traceId)
 ```
 
-`login()` returns a `LoginResult` containing the verified `jwt`.
+`login()` returns a `LoginResult` containing the verified `jwt` and the `traceId` for the login flow. You can inspect traces in the Idura dashboard.
 
 The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method:
 
@@ -120,7 +121,7 @@ val streetAddress = result.jwt.getClaimAsMap("address")?.get("street_address") a
 
 ## Error handling
 
-`IduraVerify.login()` throws `IduraVerifyException` for any runtime failure, with concrete subclasses you can pattern-match on:
+`IduraVerify.login()` throws `IduraVerifyException` for any runtime failure, with concrete subclasses you can pattern-match on. The trace ID of the failed flow is available on `ex.traceId`:
 
 ```kt
 import eu.idura.verify.IduraVerifyException
@@ -129,7 +130,7 @@ import eu.idura.verify.OAuthException
 import eu.idura.verify.UserCancelledException
 
 try {
-  val jwt = iduraVerify.login(DanishMitID.substantial())
+  val result = iduraVerify.login(DanishMitID.substantial())
   // ...
 } catch (ex: UserCancelledException) {
   // User dismissed the browser tab or the IdP returned `access_denied`. Usually a normal
@@ -142,6 +143,7 @@ try {
 } catch (ex: IduraVerifyException) {
   // Catch-all for SDK-internal failures (PAR, JWT verification, browser plumbing). Treat
   // as unrecoverable; surface a generic error to the user and log the cause.
+  // `ex.traceId` carries the trace ID.
 }
 ```
 
