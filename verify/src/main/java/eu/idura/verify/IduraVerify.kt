@@ -32,7 +32,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 import net.openid.appauth.AppAuthConfiguration
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationManagementActivity
@@ -575,6 +578,7 @@ class IduraVerify(
   /**
    * Starts the PAR flow, as described in https://datatracker.ietf.org/doc/html/rfc9126
    */
+  @OptIn(ExperimentalSerializationApi::class)
   private suspend fun pushAuthorizationRequest(
     authorizationRequest: AuthorizationRequest,
     span: Span,
@@ -604,9 +608,29 @@ class IduraVerify(
       }
 
     if (response.status.value != 201) {
-      throw IduraVerifyInternalException(
-        "PAR request failed: ${response.status.value} ${response.status.description}",
+      // Per RFC 9126 §2.3, PAR error responses use the OAuth 2.0 JSON error format.
+      // Surface those to the consumer as OAuthException so e.g. a misconfigured
+      // redirect_uri produces an actionable message rather than an opaque internal error.
+      @Serializable()
+      @JsonIgnoreUnknownKeys
+      data class ParErrorResponse(
+        val error: String,
+        @SerialName("error_description")
+        val errorDescription: String? = null,
       )
+      val parsedError =
+        runCatching { response.body<ParErrorResponse>() }.getOrNull()
+
+      throw if (parsedError != null) {
+        OAuthException(
+          error = parsedError.error,
+          errorDescription = parsedError.errorDescription,
+        )
+      } else {
+        IduraVerifyInternalException(
+          "PAR request failed: ${response.status.value} ${response.status.description}",
+        )
+      }
     }
 
     @Serializable()
