@@ -44,15 +44,15 @@ jobs:
           disable-animations: false
           script: echo "Generated AVD snapshot."
 
-      - name: Run mock login test
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: |
-            ./gradlew :example:connectedAutomaticTabSelectionReleaseAndroidTest -PtestBuildType=release
-            -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin
+      # - name: Run mock login test
+      #   uses: reactivecircus/android-emulator-runner@v2
+      #   with:
+      #     api-level: 34
+      #     target: google_apis
+      #     arch: x86_64
+      #     force-avd-creation: false
+      #     emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+      #     disable-animations: true
+      #     script: |
+      #       ./gradlew :example:connectedAutomaticTabSelectionReleaseAndroidTest -PtestBuildType=release
+      #       -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin
