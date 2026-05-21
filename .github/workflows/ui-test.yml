@@ -1,0 +1,82 @@
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mock-login:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-34-google-apis-x86_64
+
+      - name: Create AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot."
+
+      - name: Run mock login test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # Folded scalar (>) collapses to one line: the action runs each line of
+          # `script:` as a separate `sh -c`, so variables would not propagate
+          # across them. Pull device-side captures (CaptureOnFailure rule writes
+          # them on failure) before the emulator is torn down, then propagate
+          # gradle's exit code.
+          script: >
+            status=0;
+            ./gradlew :example:connectedAutomaticTabSelectionReleaseAndroidTest -PtestBuildType=release -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin || status=$?;
+            adb pull /sdcard/Android/data/eu.idura.verifyexample/files/test-failures . 2>/dev/null || true;
+            exit $status
+
+      - name: Upload Gradle test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidTest-report
+          path: |
+            example/build/reports/androidTests/
+            example/build/outputs/androidTest-results/
+
+      - name: Upload device captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidTest-captures
+          path: test-failures/
+          if-no-files-found: ignore

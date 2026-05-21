@@ -235,7 +235,13 @@ class IduraVerify(
 
   override fun onCreate(owner: LifecycleOwner) {
     tabType =
-      if (CustomTabsClient.isAuthTabSupported(
+      if (BuildConfig.DEBUG && BuildConfig.TAB_TYPE !== "AUTO") {
+        when (BuildConfig.TAB_TYPE) {
+          "CUSTOM_TAB" -> TabType.CustomTab
+          "AUTH_TAB" -> TabType.AuthTab
+          else -> throw Error("Unsupported tab type override, ${BuildConfig.TAB_TYPE}")
+        }
+      } else if (CustomTabsClient.isAuthTabSupported(
           activity,
           Browsers.Chrome.PACKAGE_NAME,
         )

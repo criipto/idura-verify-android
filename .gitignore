@@ -26,6 +26,9 @@ render.experimental.xml
 # Keystore files
 *.jks
 *.keystore
+# Exception: example app's debug keystore is checked in so CI builds match the
+# signing-cert SHA registered on the Idura backend's assetlinks.json.
+!example/debug.keystore
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json
