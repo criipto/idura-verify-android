@@ -9,11 +9,15 @@ import androidx.test.uiautomator.textAsString
 import androidx.test.uiautomator.uiAutomator
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LoginTest {
+  @get:Rule
+  val captureOnFailure = CaptureOnFailure()
+
   @Test
   fun runMockLogin() =
     uiAutomator {
