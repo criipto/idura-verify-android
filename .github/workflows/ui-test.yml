@@ -53,12 +53,15 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          # Pull device-side captures (CaptureOnFailure rule writes here on failure)
-          # before the emulator gets torn down, then propagate gradle's exit code.
-          script: |
-            status=0
-            ./gradlew :example:connectedAutomaticTabSelectionReleaseAndroidTest -PtestBuildType=release -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin || status=$?
-            adb pull /sdcard/Android/data/eu.idura.verifyexample/files/test-failures . 2>/dev/null || true
+          # Folded scalar (>) collapses to one line: the action runs each line of
+          # `script:` as a separate `sh -c`, so variables would not propagate
+          # across them. Pull device-side captures (CaptureOnFailure rule writes
+          # them on failure) before the emulator is torn down, then propagate
+          # gradle's exit code.
+          script: >
+            status=0;
+            ./gradlew :example:connectedAutomaticTabSelectionReleaseAndroidTest -PtestBuildType=release -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin || status=$?;
+            adb pull /sdcard/Android/data/eu.idura.verifyexample/files/test-failures . 2>/dev/null || true;
             exit $status
 
       - name: Upload Gradle test report
