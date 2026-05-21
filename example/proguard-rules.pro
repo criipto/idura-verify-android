@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# androidx.test:runner is on androidTestImplementation, so its consumer
+# proguard rules are not applied to the app's R8 step. Its transitive deps
+# (androidx.tracing, Kotlin stdlib) end up in the app's classpath but get
+# stripped because the app itself does not reference them. The release
+# androidTest APK then assumes those classes live in the app APK, so the
+# runner's onCreate crashes with NoClassDefFoundError at runtime. Keep them
+# in the app APK so instrumented tests can start.
+-keep class androidx.tracing.** { *; }
+-keep class kotlin.** { *; }
+-keep interface kotlin.** { *; }
