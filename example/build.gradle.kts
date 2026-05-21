@@ -33,7 +33,12 @@ android {
       buildConfigField("String", "IDURA_CLIENT_ID", "\"$iduraClientId\"")
     }
     release {
-      isMinifyEnabled = false
+      // Minify the example app so CI exercises the same R8 path real consumers hit,
+      // catching missing consumer-rules.pro entries before they ship.
+      isMinifyEnabled = true
+      // The example app is never published — sign release with the auto-generated
+      // debug keystore so CI can assemble without release-signing secrets.
+      signingConfig = signingConfigs.getByName("debug")
       proguardFiles(
         getDefaultProguardFile("proguard-android-optimize.txt"),
         "proguard-rules.pro",
