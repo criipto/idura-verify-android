@@ -29,3 +29,7 @@ jobs:
         uses: burrunan/gradle-cache-action@v3
         with:
           arguments: test
+      - name: Build minified example app
+        uses: burrunan/gradle-cache-action@v3
+        with:
+          arguments: :example:assembleRelease
