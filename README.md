@@ -14,7 +14,7 @@ The SDK _can_ work with other browsers (such as Opera and Firefox). However, the
 Add the following to your `build.gradle.kts` file:
 
 ```kts
-implementation("eu.idura:verify:1.0.0")
+implementation("eu.idura:verify:2.0.1")
 ```
 
 # Usage
