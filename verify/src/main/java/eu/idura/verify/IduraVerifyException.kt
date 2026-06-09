@@ -30,7 +30,9 @@ abstract class IduraVerifyException(
  * error condition; consumers will typically just return the user to whatever screen they were
  * on, without surfacing the exception as an error.
  */
-class UserCancelledException : IduraVerifyException("User cancelled login")
+class UserCancelledException(
+  cause: Throwable? = null,
+) : IduraVerifyException("User cancelled login", cause)
 
 /**
  * No browser on the device is capable of running the authentication flow.
@@ -73,10 +75,18 @@ class IduraVerifyInternalException(
  * consumer and surfaces as an internal error with the AppAuth exception preserved as cause.
  */
 internal fun AuthorizationException.toIduraVerifyException(): IduraVerifyException =
-  if (type == AuthorizationException.TYPE_GENERAL_ERROR &&
-    code == AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW.code
+  if ((
+      // User closed browser
+      type == AuthorizationException.TYPE_GENERAL_ERROR &&
+        code == AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW.code
+    ) ||
+    (
+      // User explicitly pressed cancel / reject inside the browser
+      type == AuthorizationException.TYPE_OAUTH_AUTHORIZATION_ERROR &&
+        code == AuthorizationException.AuthorizationRequestErrors.ACCESS_DENIED.code
+    )
   ) {
-    UserCancelledException()
+    UserCancelledException(cause = this)
   } else {
     IduraVerifyInternalException(
       "Browser flow failed: ${errorDescription ?: error ?: "type=$type code=$code"}",
