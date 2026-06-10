@@ -117,6 +117,49 @@ dependencies {
   debugImplementation(exampleLibs.androidx.compose.ui.test.manifest)
 }
 
+// The SE BankID PIN keypad ignores injected taps (UiAutomator / `adb shell input
+// tap`), so LoginTest#runSEBankID drives it through a kernel-level UHID virtual
+// touchscreen. This task compiles that tiny native injector with the NDK and pushes
+// it to the device. Requires NDK 27.1.12297006 installed and a single connected
+// device (local-only — runSEBankID can't run on the CI emulator since BankID won't
+// run emulated). The connected-test tasks depend on it only when the NDK is present
+// (see below), so the NDK-less CI emulator job isn't blocked by it.
+val uhidNdkDir = File(android.sdkDirectory, "ndk/27.1.12297006")
+val deployUhidTouch by tasks.registering {
+  group = "verification"
+  description = "Compiles and pushes the UHID touch injector used by runSEBankID."
+  val src = file("src/androidTest/cpp/uhid_touch.c")
+  val out = layout.buildDirectory.file("uhid/uhid_touch")
+  val sdkDir = android.sdkDirectory
+  inputs.file(src)
+  outputs.file(out)
+  doLast {
+    require(
+      uhidNdkDir.isDirectory,
+    ) { "NDK 27.1.12297006 not found at $uhidNdkDir — install it via the SDK Manager." }
+    val hostDir =
+      File(uhidNdkDir, "toolchains/llvm/prebuilt").listFiles()?.firstOrNull { it.isDirectory }
+        ?: error("NDK prebuilt toolchain not found under $uhidNdkDir")
+    val clang = File(hostDir, "bin/aarch64-linux-android33-clang")
+    val adb = File(sdkDir, "platform-tools/adb")
+    val binary = out.get().asFile
+    binary.parentFile.mkdirs()
+    project.exec { commandLine(clang, "-O2", "-Wall", "-pie", "-o", binary, src) }
+    project.exec { commandLine(adb, "push", binary, "/data/local/tmp/uhid_touch") }
+    project.exec { commandLine(adb, "shell", "chmod", "755", "/data/local/tmp/uhid_touch") }
+  }
+}
+
+// Only runSEBankID uses the injector, and building it needs the NDK, so wire it into
+// the connected-test tasks only when the NDK is installed (i.e. local dev machines
+// that can run runSEBankID). The CI emulator job runs just runMockLogin and has no
+// NDK, so it skips the injector rather than failing to build it.
+tasks.configureEach {
+  if (uhidNdkDir.isDirectory && name.startsWith("connected") && name.endsWith("AndroidTest")) {
+    dependsOn(deployUhidTouch)
+  }
+}
+
 tasks.register("runAllBrowserTests") {
   group = "verification"
   description = "Runs UIAutomator tests for both Custom Tab and Auth Tab paths."
