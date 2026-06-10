@@ -5,10 +5,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  ORG_GRADLE_PROJECT_iduraDomain: ${{ secrets.IDURA_VERIFY_DOMAIN }}
-  ORG_GRADLE_PROJECT_iduraClientId: ${{ secrets.IDURA_VERIFY_CLIENT_ID }}
-
 jobs:
   check:
     runs-on: ubuntu-latest
