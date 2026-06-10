@@ -57,5 +57,17 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            ./gradlew :example:runAllBrowserTests -PtestBuildType=release -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin
+          script: ./gradlew :example:runAllBrowserTests -PtestBuildType=release -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.LoginTest#runMockLogin
+
+      # connected_android_test_additional_output/ is where AGP auto-pulls files
+      # written by tests to the additionalTestOutputDir instrumentation arg
+      # (used by CaptureOnFailure to drop screenshots and hierarchy dumps).
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: androidTest-artifacts
+          path: |
+            example/build/reports/androidTests/
+            example/build/outputs/androidTest-results/
+            example/build/outputs/connected_android_test_additional_output/
