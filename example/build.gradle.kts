@@ -56,7 +56,7 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    testInstrumentationRunner = "eu.idura.verifyexample.IduraTestRunner"
 
     manifestPlaceholders["iduraDomain"] = iduraDomain
   }
@@ -110,6 +110,8 @@ dependencies {
   // Replace this dependency to test against the published version of the library
   implementation(project(":verify"))
   // implementation(exampleLibs.verify)
+
+  androidTestImplementation(exampleLibs.androidx.test.uiautomator)
 
   androidTestImplementation(platform(exampleLibs.androidx.compose.bom))
   androidTestImplementation(exampleLibs.androidx.compose.ui.test.junit4)
