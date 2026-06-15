@@ -218,6 +218,7 @@ fun LoginScreen(
           val buttonModifier = Modifier.fillMaxWidth()
 
           Text(text = "Login", fontSize = 30.sp)
+          Text(text = "Using ${BuildConfig.TAB_TYPE}")
           Spacer(modifier = Modifier.height(50.dp))
 
           val errorMessage = loginState.errorMessage
@@ -249,7 +250,13 @@ fun LoginScreen(
           Button(onClick = {
             onLogin?.invoke(SwedishBankID.sameDevice().withMessage("hello!"))
           }, modifier = buttonModifier) {
-            Text(text = "Login with SE BankID")
+            Text(text = "Login with SE BankID same device")
+          }
+
+          Button(onClick = {
+            onLogin?.invoke(SwedishBankID.selectorPage().withMessage("hello!"))
+          }, modifier = buttonModifier) {
+            Text(text = "Login with SE BankID selector page")
           }
 
           Button(onClick = {

@@ -235,7 +235,19 @@ class IduraVerify(
 
   override fun onCreate(owner: LifecycleOwner) {
     tabType =
-      if (CustomTabsClient.isAuthTabSupported(
+      // The customTab/authTab flavors pin the tab type so tests can exercise each
+      // path deterministically. The published artifact is the automaticTabSelection
+      // flavor (TAB_TYPE == "AUTO"), so consumers always fall through to auto-select;
+      // the override only fires for the flavors the example app builds. Not gated on
+      // BuildConfig.DEBUG so the instrumented tests can force a tab type against the
+      // minified release build.
+      if (BuildConfig.TAB_TYPE != "AUTO") {
+        when (BuildConfig.TAB_TYPE) {
+          "CUSTOM_TAB" -> TabType.CustomTab
+          "AUTH_TAB" -> TabType.AuthTab
+          else -> throw Error("Unsupported tab type override, ${BuildConfig.TAB_TYPE}")
+        }
+      } else if (CustomTabsClient.isAuthTabSupported(
           activity,
           Browsers.Chrome.PACKAGE_NAME,
         )
