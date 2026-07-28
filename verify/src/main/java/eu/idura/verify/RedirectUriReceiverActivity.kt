@@ -10,8 +10,13 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceBundle: Bundle?) {
     super.onCreate(savedInstanceBundle)
 
+    // AppAuth reads the response — including the state it validates the request against — from
+    // the query string only, so a fragment-mode callback has to be rewritten before it is handed
+    // over, or the flow fails as a state mismatch.
+    val callbackUri = intent.data!!.withFragmentParametersAsQuery()
+
     val isAppswitch =
-      intent.data!!
+      callbackUri
         .queryParameterNames
         .contains(APPSWITCH_QUERY_PARAM)
 
@@ -20,7 +25,7 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
       startActivity(
         AuthorizationManagementActivity.createResponseHandlingIntent(
           this,
-          intent.data,
+          callbackUri,
         ),
       )
     }

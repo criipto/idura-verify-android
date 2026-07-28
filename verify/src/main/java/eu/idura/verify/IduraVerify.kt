@@ -347,7 +347,8 @@ class IduraVerify(
     httpClient.close()
   }
 
-  private fun handleResultUri(uri: Uri) = browserFlowSlot.resume(uri)
+  private fun handleResultUri(uri: Uri) =
+    browserFlowSlot.resume(uri.withFragmentParametersAsQuery())
 
   private fun handleException(ex: Exception) = browserFlowSlot.fail(ex)
 
