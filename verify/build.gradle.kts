@@ -125,4 +125,7 @@ dependencies {
   implementation(libraryLibs.java.uuid.generator)
 
   testImplementation(libraryLibs.kotlinx.coroutines.test)
+  // Gives the JVM unit tests a real android.net.Uri, so the callback parsing can be covered
+  // without an emulator.
+  testImplementation(libraryLibs.robolectric)
 }

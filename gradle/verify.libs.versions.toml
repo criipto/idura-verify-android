@@ -8,6 +8,7 @@ javaUuidGenerator = "5.1.1"
 opentelemetryBom = "1.55.0"
 browser = "1.10.0"
 kotlinxCoroutinesTest = "1.10.2"
+robolectric = "4.15.1"
 
 [libraries]
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
@@ -29,3 +30,4 @@ opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporte
 java-uuid-generator = { module = "com.fasterxml.uuid:java-uuid-generator", version.ref = "javaUuidGenerator" }
 
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest"}
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
