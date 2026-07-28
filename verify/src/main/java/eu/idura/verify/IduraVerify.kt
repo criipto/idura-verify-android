@@ -42,6 +42,7 @@ import net.openid.appauth.AuthorizationManagementActivity
 import net.openid.appauth.AuthorizationManagementRequest
 import net.openid.appauth.AuthorizationManagementResponse
 import net.openid.appauth.AuthorizationRequest
+import net.openid.appauth.AuthorizationRequest.ResponseMode
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
 import net.openid.appauth.AuthorizationServiceConfiguration
@@ -445,6 +446,7 @@ class IduraVerify(
                 redirectUri,
               ).setScope(scopes.joinToString(" "))
               .setAdditionalParameters(mapOf("acr_values" to eid.acrValue))
+              .setResponseMode(ResponseMode.QUERY)
               .setLoginHint(loginHints.joinToString(" "))
               .setPrompt(prompt?.str)
               .build()
