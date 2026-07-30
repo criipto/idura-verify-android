@@ -111,7 +111,6 @@ dependencies {
   implementation(libraryLibs.androidx.browser)
   implementation(libraryLibs.androidx.appcompat)
   implementation(libraryLibs.appauth)
-  implementation(libraryLibs.jwks.rsa)
   implementation(libraryLibs.java.jwt)
   implementation(libraryLibs.ktor.client.core)
   implementation(libraryLibs.ktor.client.android)

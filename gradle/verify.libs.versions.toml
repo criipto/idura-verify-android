@@ -1,7 +1,6 @@
 [versions]
 appcompat = "1.7.1"
 appauth = "0.11.1"
-jwksRsa = "0.24.0"
 javaJwt = "4.5.2"
 ktor = "3.2.4"
 javaUuidGenerator = "5.1.1"
@@ -15,7 +14,6 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 
 appauth = {group = "net.openid", name="appauth", version.ref = "appauth"}
 java-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "javaJwt" }
-jwks-rsa = { group = "com.auth0", name = "jwks-rsa", version.ref = "jwksRsa" }
 
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }

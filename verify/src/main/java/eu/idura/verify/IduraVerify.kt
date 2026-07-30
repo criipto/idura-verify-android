@@ -14,7 +14,6 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import eu.idura.verify.eid.EID
@@ -28,10 +27,8 @@ import io.ktor.serialization.kotlinx.json.json
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -54,7 +51,6 @@ import net.openid.appauth.browser.BrowserMatcher
 import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
-import java.security.interfaces.RSAPublicKey
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -524,7 +520,7 @@ class IduraVerify(
           getIduraJWKS().find { it.id == keyId }
             ?: throw IduraVerifyInternalException("Unknown JWT signing key: $keyId")
 
-        val algorithm = Algorithm.RSA256(key.publicKey as RSAPublicKey)
+        val algorithm = Algorithm.RSA256(key.publicKey)
         Auth0JWT
           .require(algorithm)
           .withIssuer("https://$domain")
@@ -697,10 +693,7 @@ class IduraVerify(
         }
       }
 
-  private suspend fun loadIduraJWKS() =
-    withContext(Dispatchers.IO) {
-      UrlJwkProvider(domain).all
-    }
+  private suspend fun loadIduraJWKS() = fetchJwks(httpClient, domain)
 
   private suspend fun loadIduraOIDCConfiguration(): AuthorizationServiceConfiguration =
     suspendCoroutine { continuation ->
