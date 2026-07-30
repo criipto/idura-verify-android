@@ -79,6 +79,13 @@ android {
         getDefaultProguardFile("proguard-android-optimize.txt"),
         "proguard-rules.pro",
       )
+      // The release androidTest APK is minified through a separate R8 invocation that
+      // does not see `proguardFiles`, so point it at the same rules (see the
+      // javax.lang.model note in proguard-rules.pro).
+      testProguardFiles(
+        getDefaultProguardFile("proguard-android-optimize.txt"),
+        "proguard-rules.pro",
+      )
     }
   }
   compileOptions {
