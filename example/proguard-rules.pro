@@ -30,3 +30,10 @@
 -keep class androidx.tracing.** { *; }
 -keep class kotlin.** { *; }
 -keep interface kotlin.** { *; }
+
+# Espresso pulls in error_prone_annotations, whose @IncompatibleModifiers /
+# @RequiredModifiers reference javax.lang.model.element.Modifier — a JDK compiler
+# API that does not exist on Android. The annotations are compile-time only, so the
+# reference is never followed at runtime. androidTest-only, hence suppressed here
+# rather than in the SDK's consumer rules.
+-dontwarn javax.lang.model.element.Modifier
