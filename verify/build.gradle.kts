@@ -56,6 +56,15 @@ android {
       )
     }
   }
+  testOptions {
+    unitTests.all {
+      // JwksIntegrationTest fetches the JWKS of whichever tenant the build targets, so the domain
+      // comes from the same property the example app builds against rather than being hardcoded
+      // in the test where it could drift.
+      it.systemProperty("IDURA_DOMAIN", providers.gradleProperty("iduraDomain").get())
+    }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
