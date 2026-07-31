@@ -136,4 +136,5 @@ dependencies {
   implementation(libraryLibs.java.uuid.generator)
 
   testImplementation(libraryLibs.kotlinx.coroutines.test)
+  testImplementation(libraryLibs.ktor.client.mock)
 }
