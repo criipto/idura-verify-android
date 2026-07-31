@@ -65,6 +65,17 @@ android {
   }
 }
 
+// The redirect URI intent filter leaves the host as a `${iduraDomain}` placeholder for consumers
+// to substitute, which is what has to reach the published AAR. The androidTest APK merges that
+// same manifest though, and the merger refuses to leave a placeholder unresolved, so the library's
+// instrumented tests could not be built at all. Substitute a value for the test APK only — setting
+// it in `defaultConfig` would bake this dead host into the AAR and break consumers' app links.
+androidComponents {
+  onVariants { variant ->
+    variant.androidTest?.manifestPlaceholders?.put("iduraDomain", "verify-android-tests.invalid")
+  }
+}
+
 mavenPublishing {
   configure(AndroidSingleVariantLibrary("automaticTabSelectionRelease"))
   publishToMavenCentral()
