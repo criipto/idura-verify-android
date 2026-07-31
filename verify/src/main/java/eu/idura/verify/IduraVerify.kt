@@ -14,8 +14,6 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import com.auth0.jwk.UrlJwkProvider
-import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import eu.idura.verify.eid.EID
 import io.ktor.client.HttpClient
@@ -28,10 +26,8 @@ import io.ktor.serialization.kotlinx.json.json
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -54,7 +50,6 @@ import net.openid.appauth.browser.BrowserMatcher
 import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
-import java.security.interfaces.RSAPublicKey
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -521,12 +516,11 @@ class IduraVerify(
 
         val keyId = decodedJWT.getHeaderClaim("kid").asString()
         val key =
-          getIduraJWKS().find { it.id == keyId }
+          getIduraJWKS().getKeyByKeyId(keyId)
             ?: throw IduraVerifyInternalException("Unknown JWT signing key: $keyId")
 
-        val algorithm = Algorithm.RSA256(key.publicKey as RSAPublicKey)
         Auth0JWT
-          .require(algorithm)
+          .require(verificationAlgorithm(key))
           .withIssuer("https://$domain")
           // Require `aud` to contain our client_id (OIDC Core 1.0 §3.1.3.7). This also
           // guarantees `decodedJWT.audience` is non-empty when constructing `JWT` below.
@@ -703,10 +697,7 @@ class IduraVerify(
         }
       }
 
-  private suspend fun loadIduraJWKS() =
-    withContext(Dispatchers.IO) {
-      UrlJwkProvider(domain).all
-    }
+  private suspend fun loadIduraJWKS() = fetchJwks(httpClient, domain)
 
   private suspend fun loadIduraOIDCConfiguration(): AuthorizationServiceConfiguration =
     suspendCoroutine { continuation ->
