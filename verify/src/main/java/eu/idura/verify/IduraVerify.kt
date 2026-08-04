@@ -596,73 +596,79 @@ class IduraVerify(
   private suspend fun pushAuthorizationRequest(
     authorizationRequest: AuthorizationRequest,
     span: Span,
-  ): Uri {
-    val authorizationRequestUri = authorizationRequest.toUri()
-    val response =
-      httpClient.submitForm(
-        url =
-          getIduraOIDCConfiguration()
-            .discoveryDoc!!
-            .docJson
-            .get(
-              "pushed_authorization_request_endpoint",
-            ).toString(),
-        formParameters =
-          parametersOf(
-            authorizationRequestUri.queryParameterNames.associateWith { key ->
-              authorizationRequestUri.getQueryParameters(key)
-            },
-          ),
-      ) {
-        tracing.propagators().textMapPropagator.inject(
-          span.storeInContext(OtelContext.current()),
-          this,
-          KtorRequestSetter,
+  ): Uri =
+    tracer
+      .spanBuilder("push authorize request")
+      .withSpanContext(span)
+      .startAndRun { _ ->
+        val authorizationRequestUri = authorizationRequest.toUri()
+        val response =
+          httpClient.submitForm(
+            url =
+              getIduraOIDCConfiguration()
+                .discoveryDoc!!
+                .docJson
+                .get(
+                  "pushed_authorization_request_endpoint",
+                ).toString(),
+            formParameters =
+              parametersOf(
+                authorizationRequestUri.queryParameterNames.associateWith { key ->
+                  authorizationRequestUri.getQueryParameters(key)
+                },
+              ),
+          ) {
+            // Propagate the login span, not the PAR span, so the server-side spans stay
+            // siblings of ours rather than nesting under the client-side timing span.
+            tracing.propagators().textMapPropagator.inject(
+              span.storeInContext(OtelContext.current()),
+              this,
+              KtorRequestSetter,
+            )
+          }
+
+        if (response.status.value != 201) {
+          // Per RFC 9126 §2.3, PAR error responses use the OAuth 2.0 JSON error format.
+          // Surface those to the consumer as OAuthException so e.g. a misconfigured
+          // redirect_uri produces an actionable message rather than an opaque internal error.
+          @Serializable()
+          @JsonIgnoreUnknownKeys
+          data class ParErrorResponse(
+            val error: String,
+            @SerialName("error_description")
+            val errorDescription: String? = null,
+          )
+          val parsedError =
+            runCatching { response.body<ParErrorResponse>() }.getOrNull()
+
+          throw if (parsedError != null) {
+            OAuthException(
+              error = parsedError.error,
+              errorDescription = parsedError.errorDescription,
+            )
+          } else {
+            IduraVerifyInternalException(
+              "PAR request failed: ${response.status.value} ${response.status.description}",
+            )
+          }
+        }
+
+        @Serializable()
+        data class ParResponse(
+          val request_uri: String,
+          val expires_in: Int,
         )
+        val parsedResponse = response.body<ParResponse>()
+
+        getIduraOIDCConfiguration()
+          .authorizationEndpoint
+          .buildUpon()
+          .appendQueryParameter("client_id", clientID)
+          .appendQueryParameter(
+            "request_uri",
+            parsedResponse.request_uri,
+          ).build()
       }
-
-    if (response.status.value != 201) {
-      // Per RFC 9126 §2.3, PAR error responses use the OAuth 2.0 JSON error format.
-      // Surface those to the consumer as OAuthException so e.g. a misconfigured
-      // redirect_uri produces an actionable message rather than an opaque internal error.
-      @Serializable()
-      @JsonIgnoreUnknownKeys
-      data class ParErrorResponse(
-        val error: String,
-        @SerialName("error_description")
-        val errorDescription: String? = null,
-      )
-      val parsedError =
-        runCatching { response.body<ParErrorResponse>() }.getOrNull()
-
-      throw if (parsedError != null) {
-        OAuthException(
-          error = parsedError.error,
-          errorDescription = parsedError.errorDescription,
-        )
-      } else {
-        IduraVerifyInternalException(
-          "PAR request failed: ${response.status.value} ${response.status.description}",
-        )
-      }
-    }
-
-    @Serializable()
-    data class ParResponse(
-      val request_uri: String,
-      val expires_in: Int,
-    )
-    val parsedResponse = response.body<ParResponse>()
-
-    return getIduraOIDCConfiguration()
-      .authorizationEndpoint
-      .buildUpon()
-      .appendQueryParameter("client_id", clientID)
-      .appendQueryParameter(
-        "request_uri",
-        parsedResponse.request_uri,
-      ).build()
-  }
 
   private val browserFlowSlot = BrowserFlowSlot<Uri>()
 

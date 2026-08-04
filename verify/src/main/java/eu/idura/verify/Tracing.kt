@@ -47,6 +47,10 @@ internal class Tracing(
         Resource
           .getDefault()
           .toBuilder()
+          // Identify ourselves as the entity producing telemetry. Without this, the OTEL
+          // SDK default of `unknown_service:java` is reported.
+          .put("service.name", "idura-verify-android")
+          .put("service.version", BuildConfig.VERSION)
           // Inspired by https://github.com/open-telemetry/opentelemetry-android/blob/79f7a5280a04bc39696dfdc4cdc9e009eac98257/core/src/main/java/io/opentelemetry/android/AndroidResource.kt
           .put("os.name", "android")
           .put("os.type", "linux")
