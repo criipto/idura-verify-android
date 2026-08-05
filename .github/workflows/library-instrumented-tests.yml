@@ -1,0 +1,75 @@
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The library's own instrumented tests exist to catch what the JVM unit tests
+  # cannot: platform behaviour that no JVM stand-in reproduces. Today that means
+  # JWK parsing, where Android ships Conscrypt/AndroidOpenSSL rather than the JVM's
+  # SunEC and a provider gap would break key parsing on device while every JVM test
+  # passed. Run the whole suite on both ends of the supported range — minSdk 26 and
+  # the current compileSdk — since platform differences are the point.
+  instrumented-tests:
+    strategy:
+      # Report a failure on one API level even if the other fails first.
+      fail-fast: false
+      matrix:
+        include:
+          # API 26 predates the Play Store images at x86_64, so use google_apis.
+          # These tests need no browser or Play services, unlike ui-test.yml.
+          - api-level: 26
+            target: google_apis
+          - api-level: 36
+            target: google_apis_playstore
+    runs-on: ubuntu-latest
+    # The emulator action has been seen to lose its emulator during boot setup and
+    # then sit there instead of failing, burning a runner for the default six hours.
+    # These jobs take under ten minutes, so cap them well short of that.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Deliberately no AVD cache here, unlike ui-test.yml. A default_boot snapshot
+      # restored onto a different runner than the one that saved it does not resume
+      # cleanly on the API 26 image: the emulator reports itself booted while the
+      # framework never comes up, so adb finds no `settings` service and the job dies
+      # during boot setup. Creating the AVD from scratch each run is also barely
+      # slower — measured at about three minutes for API 26 versus five with a warm
+      # cache for API 36 — so there is little to win back by caching.
+      #
+      # One flavor only: the tabType flavors differ in a BuildConfig field the
+      # library's instrumented tests never read, so running all three would just
+      # execute the same tests three times per API level.
+      - name: Run library instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew :verify:connectedAutomaticTabSelectionDebugAndroidTest
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: library-androidTest-artifacts-api${{ matrix.api-level }}
+          path: |
+            verify/build/reports/androidTests/
+            verify/build/outputs/androidTest-results/
