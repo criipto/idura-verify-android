@@ -18,6 +18,7 @@ import io.opentelemetry.sdk.trace.IdGenerator
 import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 private class IduraIdGenerator : IdGenerator {
   private val uuidV7Generator =
@@ -37,6 +38,8 @@ private class IduraIdGenerator : IdGenerator {
 
 internal class Tracing(
   serverAddress: String,
+  // Overridable so tests can point the exporter at a local stub endpoint
+  telemetryEndpoint: String = TELEMETRY_ENDPOINT,
 ) {
   private val tracerProvider =
     SdkTracerProvider
@@ -72,12 +75,28 @@ internal class Tracing(
             OtlpHttpSpanExporter
               .builder()
               .setEndpoint(
-                "https://telemetry.idura.app/v1/traces",
+                telemetryEndpoint,
               ).build(),
           ).build(),
       ).build()
 
-  fun close() = tracerProvider.close()
+  /**
+   * Shuts down tracing, flushing any pending spans in the background.
+   *
+   * This deliberately calls `shutdown` rather than `close`: `close` joins the flush for up to 10
+   * seconds, and since this is called from `onDestroy` on the main thread, an unreachable
+   * telemetry endpoint would block the main thread until the export timed out. The flush still
+   * happens on the exporter's own worker thread, we just do not wait for it. Losing a trailing
+   * span matters far less than stalling the host app.
+   */
+  fun close() {
+    tracerProvider.shutdown()
+  }
+
+  /** Exports any pending spans, waiting up to [timeoutSeconds] for the export to complete. */
+  fun forceFlush(timeoutSeconds: Long = 10) {
+    tracerProvider.forceFlush().join(timeoutSeconds, TimeUnit.SECONDS)
+  }
 
   fun getTracer(
     instrumentationScopeName: String,
@@ -86,6 +105,10 @@ internal class Tracing(
 
   fun propagators(): ContextPropagators =
     ContextPropagators.create(W3CTraceContextPropagator.getInstance())
+
+  internal companion object {
+    const val TELEMETRY_ENDPOINT = "https://telemetry.idura.app/v1/traces"
+  }
 }
 
 internal object KtorRequestSetter : TextMapSetter<HttpRequestBuilder> {
