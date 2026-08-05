@@ -24,7 +24,11 @@ class LoginTest {
     uiAutomator {
       startApp("eu.idura.verifyexample")
       onElement { textAsString() == "Login with Mock" }.click()
-      onElement { textAsString() == "Logged in!" }.click()
+      // A mock login still round-trips the browser, the token endpoint and the JWKS
+      // fetch, which on a cold CI emulator has been observed to land just past
+      // onElement's 10s default. Wait long enough that a slow-but-working login is
+      // not reported as a missing element.
+      onElement(timeoutMs = LOGIN_TIMEOUT_MS) { textAsString() == "Logged in!" }.click()
     }
 
   fun assertTabType(device: UiDevice) =
@@ -274,5 +278,13 @@ class LoginTest {
       onElement { textAsString() == "Logged in!" }
       onElement { textAsString() == "novippslogin" }
     }
+  }
+
+  private companion object {
+    /**
+     * Generous enough to cover a cold emulator completing the whole OIDC round trip,
+     * since overshooting only costs wall-clock on a run that was going to fail anyway.
+     */
+    const val LOGIN_TIMEOUT_MS = 30_000L
   }
 }
