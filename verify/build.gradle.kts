@@ -56,12 +56,32 @@ android {
       )
     }
   }
+  testOptions {
+    unitTests.all {
+      // JwksIntegrationTest fetches the JWKS of whichever tenant the build targets, so the domain
+      // comes from the same property the example app builds against rather than being hardcoded
+      // in the test where it could drift.
+      it.systemProperty("IDURA_DOMAIN", providers.gradleProperty("iduraDomain").get())
+    }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
   kotlinOptions {
     jvmTarget = "11"
+  }
+}
+
+// The redirect URI intent filter leaves the host as a `${iduraDomain}` placeholder for consumers
+// to substitute, which is what has to reach the published AAR. The androidTest APK merges that
+// same manifest though, and the merger refuses to leave a placeholder unresolved, so the library's
+// instrumented tests could not be built at all. Substitute a value for the test APK only — setting
+// it in `defaultConfig` would bake this dead host into the AAR and break consumers' app links.
+androidComponents {
+  onVariants { variant ->
+    variant.androidTest?.manifestPlaceholders?.put("iduraDomain", "verify-android-tests.invalid")
   }
 }
 
@@ -111,8 +131,8 @@ dependencies {
   implementation(libraryLibs.androidx.browser)
   implementation(libraryLibs.androidx.appcompat)
   implementation(libraryLibs.appauth)
-  implementation(libraryLibs.jwks.rsa)
   implementation(libraryLibs.java.jwt)
+  implementation(libraryLibs.nimbus.jose.jwt)
   implementation(libraryLibs.ktor.client.core)
   implementation(libraryLibs.ktor.client.android)
   implementation(libraryLibs.ktor.client.content.negotiation)
@@ -125,4 +145,5 @@ dependencies {
   implementation(libraryLibs.java.uuid.generator)
 
   testImplementation(libraryLibs.kotlinx.coroutines.test)
+  testImplementation(libraryLibs.ktor.client.mock)
 }

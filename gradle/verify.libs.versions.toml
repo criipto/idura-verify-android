@@ -1,8 +1,8 @@
 [versions]
 appcompat = "1.7.1"
 appauth = "0.11.1"
-jwksRsa = "0.24.0"
 javaJwt = "4.5.2"
+nimbusJoseJwt = "10.9.1"
 ktor = "3.2.4"
 javaUuidGenerator = "5.1.1"
 opentelemetryBom = "1.55.0"
@@ -15,10 +15,11 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 
 appauth = {group = "net.openid", name="appauth", version.ref = "appauth"}
 java-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "javaJwt" }
-jwks-rsa = { group = "com.auth0", name = "jwks-rsa", version.ref = "jwksRsa" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
 
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
