@@ -1,5 +1,7 @@
 package eu.idura.verify
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.InetAddress
@@ -80,6 +82,27 @@ class TracingExportFailureTest {
       assertTrue("expected a valid span context", span.spanContext.isValid)
 
       tracing.close()
+    }
+  }
+
+  @Test
+  fun `close shuts the tracer down off the calling thread`() {
+    // BatchSpanProcessor can run the exporter's shutdown inline on whichever thread called it,
+    // where it closes okhttp's pooled connections. On the main thread, closing a live TLS
+    // connection is a fatal NetworkOnMainThreadException.
+    StubCollector(statusCode = 200).use { collector ->
+      val tracing = Tracing("test.idura.app", telemetryEndpoint = collector.endpoint)
+      val tracer = tracing.getTracer("test", "0.0.0")
+
+      tracer.spanBuilder("test span").startSpan().end()
+
+      val shutdown = tracing.close()
+
+      assertNotSame("the shutdown ran on the calling thread", Thread.currentThread(), shutdown)
+      shutdown.join(TimeUnit.SECONDS.toMillis(10))
+      assertFalse("the shutdown did not finish", shutdown.isAlive)
+      // Off the main thread the shutdown can afford to join the flush, so the span still leaves
+      assertTrue("expected the trailing span to be exported", collector.requestCount() >= 1)
     }
   }
 

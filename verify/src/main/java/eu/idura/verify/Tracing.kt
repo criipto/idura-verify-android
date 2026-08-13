@@ -1,6 +1,7 @@
 package eu.idura.verify
 
 import android.os.Build
+import android.util.Log
 import com.fasterxml.uuid.Generators
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
@@ -19,6 +20,7 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 private class IduraIdGenerator : IdGenerator {
   private val uuidV7Generator =
@@ -81,17 +83,32 @@ internal class Tracing(
       ).build()
 
   /**
-   * Shuts down tracing, flushing any pending spans in the background.
+   * Shuts down tracing on a background thread, flushing any pending spans.
    *
-   * This deliberately calls `shutdown` rather than `close`: `close` joins the flush for up to 10
-   * seconds, and since this is called from `onDestroy` on the main thread, an unreachable
-   * telemetry endpoint would block the main thread until the export timed out. The flush still
-   * happens on the exporter's own worker thread, we just do not wait for it. Losing a trailing
-   * span matters far less than stalling the host app.
+   * The shutdown must not run on the calling thread when that thread is the main one, which it is
+   * when this is called from `onDestroy`. `BatchSpanProcessor` hands the exporter's shutdown to
+   * `CompletableResultCode.whenComplete`, which runs its callback inline on the calling thread
+   * whenever the flush it is waiting for has already finished. That callback reaches okhttp's
+   * `ConnectionPool.evictAll`, and closing a live TLS connection writes a close_notify, which
+   * StrictMode turns into a fatal `NetworkOnMainThreadException`. The race is narrow but lands
+   * often enough to be reported from the field.
+   *
+   * Off the main thread there is nothing to be gained from not waiting, so this joins the flush
+   * and the trailing span is exported rather than dropped.
+   *
+   * @return the thread performing the shutdown, so tests can wait for it.
    */
-  fun close() {
-    tracerProvider.shutdown()
-  }
+  fun close(): Thread =
+    thread(name = "idura-verify-tracing-shutdown") {
+      try {
+        tracerProvider.close()
+      } catch (throwable: Throwable) {
+        // Telemetry teardown has nothing worth recovering, but an uncaught throw here would take
+        // the host app's process down. okhttp rethrows RuntimeExceptions out of its socket
+        // closeQuietly, which is how the NetworkOnMainThreadException above surfaced at all.
+        Log.w(TAG, "Failed to shut telemetry down", throwable)
+      }
+    }
 
   /** Exports any pending spans, waiting up to [timeoutSeconds] for the export to complete. */
   fun forceFlush(timeoutSeconds: Long = 10) {
