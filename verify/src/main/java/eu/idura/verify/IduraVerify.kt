@@ -50,6 +50,7 @@ import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
 import java.util.WeakHashMap
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -682,29 +683,48 @@ class IduraVerify(
       .withSpanContext(span)
       .startAndRun { _ ->
         val authorizationRequestUri = authorizationRequest.toUri()
-        val response =
-          httpClient.submitForm(
-            url =
-              getIduraOIDCConfiguration()
-                .discoveryDoc!!
-                .docJson
-                .get(
-                  "pushed_authorization_request_endpoint",
-                ).toString(),
-            formParameters =
-              parametersOf(
-                authorizationRequestUri.queryParameterNames.associateWith { key ->
-                  authorizationRequestUri.getQueryParameters(key)
-                },
-              ),
-          ) {
-            // Propagate the login span, not the PAR span, so the server-side spans stay
-            // siblings of ours rather than nesting under the client-side timing span.
-            tracing.propagators().textMapPropagator.inject(
-              span.storeInContext(OtelContext.current()),
-              this,
-              KtorRequestSetter,
+
+        // Resolved outside the try below so that a tenant whose discovery document omits the
+        // endpoint gets an actionable error instead of a JSONException wrapped as a transport
+        // failure.
+        val parEndpoint =
+          getIduraOIDCConfiguration()
+            .discoveryDoc
+            ?.docJson
+            ?.optString("pushed_authorization_request_endpoint")
+            ?.takeIf { it.isNotEmpty() }
+            ?: throw IduraVerifyInternalException(
+              "Discovery document for $domain advertises no pushed_authorization_request_endpoint",
             )
+
+        // Ktor surfaces failures as a wide range of unrelated types — IOException from the engine,
+        // a timeout, an engine specific wrapper — so catch broadly to keep the promise that every
+        // SDK failure arrives as an IduraVerifyException. CancellationException is itself an
+        // Exception, and swallowing it would turn Activity teardown mid-login into a bogus PAR
+        // failure, so it is let through.
+        val response =
+          try {
+            httpClient.submitForm(
+              url = parEndpoint,
+              formParameters =
+                parametersOf(
+                  authorizationRequestUri.queryParameterNames.associateWith { key ->
+                    authorizationRequestUri.getQueryParameters(key)
+                  },
+                ),
+            ) {
+              // Propagate the login span, not the PAR span, so the server-side spans stay
+              // siblings of ours rather than nesting under the client-side timing span.
+              tracing.propagators().textMapPropagator.inject(
+                span.storeInContext(OtelContext.current()),
+                this,
+                KtorRequestSetter,
+              )
+            }
+          } catch (ex: CancellationException) {
+            throw ex
+          } catch (ex: Exception) {
+            throw IduraVerifyInternalException("PAR request to $parEndpoint failed", cause = ex)
           }
 
         if (response.status.value != 201) {
@@ -738,7 +758,17 @@ class IduraVerify(
           val request_uri: String,
           val expires_in: Int,
         )
-        val parsedResponse = response.body<ParResponse>()
+        val parsedResponse =
+          try {
+            response.body<ParResponse>()
+          } catch (ex: CancellationException) {
+            throw ex
+          } catch (ex: Exception) {
+            throw IduraVerifyInternalException(
+              "Could not parse the PAR response from $parEndpoint",
+              cause = ex,
+            )
+          }
 
         getIduraOIDCConfiguration()
           .authorizationEndpoint
