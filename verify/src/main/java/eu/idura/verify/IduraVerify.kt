@@ -790,7 +790,13 @@ class IduraVerify(
       ) { serviceConfiguration, ex ->
         if (ex != null) {
           Log.e(TAG, "Failed to fetch OIDC configuration", ex)
-          continuation.resumeWithException(ex)
+          continuation.resumeWithException(
+            IduraVerifyInternalException(
+              "Failed to fetch OIDC configuration from https://$domain: " +
+                (ex.errorDescription ?: ex.error ?: "type=${ex.type} code=${ex.code}"),
+              cause = ex,
+            ),
+          )
         } else {
           Log.d(TAG, "Fetched OIDC configuration")
           continuation.resume(serviceConfiguration!!)
