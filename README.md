@@ -25,7 +25,7 @@ If you prefer a more interactive approach, there is an [example project](https:/
 
 The SDK needs to be configured with two pieces of information:
 
-- Your Idura domain.
+- Your Idura domain, as a bare host name such as `this-is-an-example.idura.broker`.
 - Your Idura client ID.
 
 The SDK assumes that:
