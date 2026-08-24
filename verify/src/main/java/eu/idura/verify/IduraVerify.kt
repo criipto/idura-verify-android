@@ -11,7 +11,6 @@ import androidx.browser.auth.AuthTabIntent.AuthResult
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.core.net.toUri
 import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.auth0.jwt.exceptions.JWTVerificationException
@@ -50,6 +49,7 @@ import net.openid.appauth.browser.BrowserMatcher
 import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
+import java.util.WeakHashMap
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -125,14 +125,24 @@ class IduraVerify(
    * An activity result launcher, used to a launch an auth tab intent and listen for the result.
    * See https://developer.android.com/training/basics/intents/result
    */
-  private var authTabIntentLauncher: ActivityResultLauncher<Intent?>
+  private lateinit var authTabIntentLauncher: ActivityResultLauncher<Intent>
 
   /**
    * An activity result launcher, used to a launch a custom tab intent and listen for the result.
    * See https://developer.android.com/training/basics/intents/result
    */
-  private var customTabIntentLauncher:
+  private lateinit var customTabIntentLauncher:
     ActivityResultLauncher<Pair<AuthorizationManagementRequest, Uri>>
+
+  /**
+   * The keys the activity result registry files our launchers under. They have to be stable across
+   * process death, because that is what a result arriving while our process was dead is delivered
+   * against. The client ID and domain are part of the key so that two differently configured
+   * instances can share one activity; two instances configured identically would collide, so the
+   * constructor rejects the second one, see [liveLauncherKeys].
+   */
+  private val authTabLauncherKey = "eu.idura.verify.authTab:$domain:$clientID"
+  private val customTabLauncherKey = "eu.idura.verify.customTab:$domain:$clientID"
 
   private val tracing = Tracing(domain)
   private val tracer =
@@ -145,25 +155,46 @@ class IduraVerify(
 
   private var foundASuitableBrowser = false
 
+  // Must be initialized before the init block: register() below replays a result queued while the
+  // process was dead synchronously, and the result handlers resume this slot. With no login in
+  // flight the slot holds no continuation, so such a replay is dropped, which is what we want —
+  // the coroutine that was waiting for it died with the process.
+  private val browserFlowSlot = BrowserFlowSlot<Uri>()
+
   init {
     require(redirectUri.scheme == "https") {
       "redirectUri must use https scheme"
     }
 
-    if (activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-      // We cannot register activity result handlers once the activity has been started, so better to fail early and explicitly
-      throw IllegalStateException(
-        "IduraVerify must be instantiated before the activity reaches STARTED, was ${activity.lifecycle.currentState.name}",
-      )
+    // ActivityResultRegistry.register silently hands an existing key's callbacks to the new
+    // registration, which would leave a displaced instance's in-flight login suspended forever.
+    // Claim our keys up front so the collision fails at construction instead. Before the
+    // lifecycle observer below, so a rejected instance leaves nothing behind.
+    check(liveLauncherKeys.getOrPut(activity) { mutableSetOf() }.add(authTabLauncherKey)) {
+      "An IduraVerify instance for clientID \"$clientID\" and domain \"$domain\" is already " +
+        "active on this activity. Reuse that instance instead of constructing another."
     }
 
     activity.lifecycle.addObserver(this)
 
+    // Register against the registry directly rather than via
+    // `ComponentActivity.registerForActivityResult`, which refuses to register once the activity
+    // is STARTED. That check exists to keep the request codes it generates from `activity_rq#<n>`
+    // reproducible across process death, which only holds if every launcher in the activity is
+    // registered unconditionally and in the same order every time. Supplying our own keys gives us
+    // that stability without the constructor having to run before the activity starts, which
+    // consumers embedding us in Flutter or React Native cannot arrange. In exchange we own the
+    // unregistering, see `onDestroy`.
     authTabIntentLauncher =
-      AuthTabIntent.registerActivityResultLauncher(activity, this::handleAuthTabResult)
+      activity.activityResultRegistry.register(
+        authTabLauncherKey,
+        AuthTabIntent.AuthenticateUserResultContract(),
+        this::handleAuthTabResult,
+      )
 
     customTabIntentLauncher =
-      activity.registerForActivityResult(
+      activity.activityResultRegistry.register(
+        customTabLauncherKey,
         object :
           ActivityResultContract<Pair<AuthorizationManagementRequest, Uri>, CustomTabResult>() {
           override fun createIntent(
@@ -210,12 +241,21 @@ class IduraVerify(
             intent: Intent?,
           ): CustomTabResult {
             Log.d(TAG, "Parsing result from custom tab intent")
-            val ex = AuthorizationException.fromIntent(intent)
+            // fromIntent refuses a null intent outright, so only ask it about a real one.
+            val ex = intent?.let { AuthorizationException.fromIntent(it) }
+            val resultUri = intent?.data
 
             return if (ex != null) {
               CustomTabResult.CustomTabFailure(ex)
+            } else if (resultUri == null) {
+              // Neither an exception nor a callback URI: a login interrupted by process death
+              // is replayed at construction as a bare RESULT_CANCELED with no intent. Treat it
+              // as the cancellation it is.
+              CustomTabResult.CustomTabFailure(
+                AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW,
+              )
             } else {
-              CustomTabResult.CustomTabSuccess(intent!!.data!!)
+              CustomTabResult.CustomTabSuccess(resultUri)
             }
           }
         },
@@ -338,7 +378,18 @@ class IduraVerify(
   }
 
   override fun onDestroy(owner: LifecycleOwner) {
-    authorizationService.dispose()
+    // Registering with our own key installs no lifecycle observer, so nothing releases the
+    // callbacks for us. Left registered they would keep this instance, and everything it holds,
+    // reachable from the registry for as long as the activity lives.
+    //
+    // Guarded because we observe the lifecycle from part way through the constructor: anything
+    // that throws after `addObserver` leaves a half built instance still registered as an
+    // observer, and this then runs against fields that were never assigned. Releasing what does
+    // exist beats masking the original failure with an NPE from the cleanup path.
+    if (::authTabIntentLauncher.isInitialized) authTabIntentLauncher.unregister()
+    if (::customTabIntentLauncher.isInitialized) customTabIntentLauncher.unregister()
+    liveLauncherKeys[activity]?.remove(authTabLauncherKey)
+    if (::authorizationService.isInitialized) authorizationService.dispose()
     tracing.close()
     httpClient.close()
   }
@@ -664,8 +715,6 @@ class IduraVerify(
           ).build()
       }
 
-  private val browserFlowSlot = BrowserFlowSlot<Uri>()
-
   private suspend fun launchBrowser(
     request: AuthorizationManagementRequest,
     uri: Uri = request.toUri(),
@@ -713,6 +762,16 @@ class IduraVerify(
         }
       }
     }
+
+  private companion object {
+    /**
+     * The launcher keys live instances hold, per activity. Lets the constructor reject a second
+     * identically configured instance, whose registration would otherwise silently displace the
+     * first one's result callbacks. Claimed keys are released in [onDestroy]; the weak keys cover
+     * activities that are destroyed without it running.
+     */
+    val liveLauncherKeys = WeakHashMap<ComponentActivity, MutableSet<String>>()
+  }
 }
 
 internal fun <T> cacheResult(
