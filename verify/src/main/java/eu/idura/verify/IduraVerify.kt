@@ -394,9 +394,44 @@ class IduraVerify(
     httpClient.close()
   }
 
-  private fun handleResultUri(uri: Uri) = browserFlowSlot.resume(uri)
+  private fun handleResultUri(uri: Uri) {
+    if (!browserFlowSlot.resume(uri)) {
+      recordDroppedBrowserResult("uri", exceptionName = null)
+    }
+  }
 
-  private fun handleException(ex: Exception) = browserFlowSlot.fail(ex)
+  private fun handleException(ex: Exception) {
+    if (!browserFlowSlot.fail(ex)) {
+      recordDroppedBrowserResult("exception", exceptionName = ex::class.simpleName)
+    }
+  }
+
+  /**
+   * A browser result arriving with no login in flight is most likely a login interrupted by
+   * process death, replayed by the activity result registry when the constructor re-registers.
+   * We drop it — the coroutine that wanted it died with the process — but record that it
+   * happened, to learn whether surviving process death is worth building. Deliberately coarse:
+   * the callback URI carries the authorization code, so neither it nor anything derived from it
+   * may end up in telemetry or the log.
+   */
+  private fun recordDroppedBrowserResult(
+    result: String,
+    exceptionName: String?,
+  ) {
+    Log.w(
+      TAG,
+      "Dropped a browser result ($result) because no login was in flight — " +
+        "most likely a login interrupted by process death",
+    )
+
+    tracer
+      .spanBuilder("dropped browser result")
+      .setNoParent()
+      .setAttribute("result", result)
+      .apply { if (exceptionName != null) setAttribute("exception", exceptionName) }
+      .startSpan()
+      .end()
+  }
 
   private fun handleCustomTabResult(result: CustomTabResult) {
     Log.i(TAG, "Handling custom tab result $result")

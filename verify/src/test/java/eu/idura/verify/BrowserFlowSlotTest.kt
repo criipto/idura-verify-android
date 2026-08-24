@@ -4,6 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -19,7 +20,7 @@ class BrowserFlowSlotTest {
       assertEquals(1, launchCount)
       assertTrue(flow.isActive)
 
-      slot.resume("ok")
+      assertTrue(slot.resume("ok"))
       assertEquals("ok", flow.await())
     }
 
@@ -30,7 +31,7 @@ class BrowserFlowSlotTest {
       val flow = async { runCatching { slot.run { } } }
       testScheduler.runCurrent()
 
-      slot.fail(IllegalArgumentException("boom"))
+      assertTrue(slot.fail(IllegalArgumentException("boom")))
 
       val ex = flow.await().exceptionOrNull()
       assertTrue("expected IllegalArgumentException, got $ex", ex is IllegalArgumentException)
@@ -105,13 +106,13 @@ class BrowserFlowSlotTest {
   fun `resume is a no-op when no flow is in progress`() =
     runTest {
       val slot = BrowserFlowSlot<String>()
-      slot.resume("nobody listening")
+      assertFalse(slot.resume("nobody listening"))
     }
 
   @Test
   fun `fail is a no-op when no flow is in progress`() =
     runTest {
       val slot = BrowserFlowSlot<String>()
-      slot.fail(Exception("nobody listening"))
+      assertFalse(slot.fail(Exception("nobody listening")))
     }
 }
