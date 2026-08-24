@@ -1,4 +1,5 @@
 [versions]
+activity = "1.9.0"
 appcompat = "1.7.1"
 appauth = "0.11.1"
 javaJwt = "4.5.2"
@@ -11,6 +12,7 @@ kotlinxCoroutinesTest = "1.10.2"
 
 [libraries]
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 appauth = {group = "net.openid", name="appauth", version.ref = "appauth"}
