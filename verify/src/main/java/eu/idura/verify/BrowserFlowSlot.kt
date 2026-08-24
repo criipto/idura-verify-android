@@ -10,6 +10,9 @@ import kotlin.coroutines.resumeWithException
  * because the activity result handlers driving [resume] / [fail] have no way to tell which of
  * several pending continuations a given callback belongs to. [run] rejects overlapping calls and
  * clears the slot in `finally` on resume, exception, and cancellation so it is reusable.
+ *
+ * [resume] and [fail] report whether a flow was actually waiting, so callers can tell a delivered
+ * result apart from a dropped one.
  */
 internal class BrowserFlowSlot<T> {
   private var continuation: CancellableContinuation<T>? = null
@@ -26,11 +29,15 @@ internal class BrowserFlowSlot<T> {
     }
   }
 
-  fun resume(value: T) {
-    continuation?.resume(value)
+  fun resume(value: T): Boolean {
+    val cont = continuation ?: return false
+    cont.resume(value)
+    return true
   }
 
-  fun fail(ex: Throwable) {
-    continuation?.resumeWithException(ex)
+  fun fail(ex: Throwable): Boolean {
+    val cont = continuation ?: return false
+    cont.resumeWithException(ex)
+    return true
   }
 }

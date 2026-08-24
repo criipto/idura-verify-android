@@ -71,7 +71,7 @@ val iduraVerify =
   )
 ```
 
-On top of the client ID and domain, you must also specify an activity. This should be the activity that hosts your login UI. The SDK uses this activity to start the intents, which opens the browser, and shows the login UI to the user. The SDK _must_ be initialized at the same time as the containing activity. That means you should probably do something like this:
+On top of the client ID and domain, you must also specify an activity. This should be the activity that hosts your login UI. The SDK uses this activity to start the intents, which opens the browser, and shows the login UI to the user. The instance is tied to that activity: it stops working once the activity is destroyed, so create a new one alongside each activity rather than holding on to it. A field initializer is the clearest place:
 
 ```kt
 class LoginActivity : ComponentActivity() {
@@ -82,6 +82,10 @@ class LoginActivity : ComponentActivity() {
   )
 }
 ```
+
+You are not restricted to that, though. The SDK can be constructed at any point in the activity's lifecycle, including after it has started.
+
+If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with an `IllegalStateException`.
 
 ### A word about redirect URLs
 
@@ -104,6 +108,8 @@ println(result.traceId)
 ```
 
 `login()` returns a `LoginResult` containing the verified `jwt` and the `traceId` for the login flow. You can inspect traces in the Idura dashboard.
+
+A login only lives as long as the activity it was started from. If the activity is recreated while the user is in the browser — a rotation, or Android reclaiming your process while it is in the background — the call is lost and `login()` never returns. The browser tab itself survives, so the user can still complete the flow there, but the result has nowhere to go and is discarded. Start a new login when the user comes back rather than waiting for the old one.
 
 The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method:
 
