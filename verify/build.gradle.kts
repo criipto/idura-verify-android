@@ -129,6 +129,11 @@ dependencies {
   androidTestImplementation(libs.androidx.espresso.core)
 
   implementation(libraryLibs.androidx.browser)
+  // `api`, not `implementation`: IduraVerify's constructor takes a ComponentActivity and the class
+  // implements DefaultLifecycleObserver, so both types are part of the SDK's public surface and
+  // have to reach a consumer's compile classpath. androidx.lifecycle arrives through this at
+  // compile scope too, since androidx.activity exposes it as `api`.
+  api(libraryLibs.androidx.activity)
   implementation(libraryLibs.androidx.appcompat)
   implementation(libraryLibs.appauth)
   implementation(libraryLibs.java.jwt)
