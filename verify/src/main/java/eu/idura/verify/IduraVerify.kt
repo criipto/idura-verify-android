@@ -103,6 +103,27 @@ class IduraVerify(
   private val redirectUri: Uri = "https://$domain/android/callback".toUri(),
   private val activity: ComponentActivity,
 ) : DefaultLifecycleObserver {
+  // Ahead of the property initializers below, because `Tracing` starts an exporter thread and
+  // nothing shuts it down if construction fails afterwards: `onDestroy` only runs once we have
+  // registered as a lifecycle observer, which happens later still.
+  init {
+    requireBareHost(domain)
+
+    require(redirectUri.scheme == "https") {
+      "redirectUri must use https scheme"
+    }
+
+    // The auth tab is handed the host and path to recognise the callback by, see `launchBrowser`.
+    // An opaque URI such as `https:callback` has neither, and passes the scheme check above.
+    require(!redirectUri.host.isNullOrBlank()) {
+      "redirectUri must have a host, got \"$redirectUri\""
+    }
+
+    require(!redirectUri.path.isNullOrEmpty()) {
+      "redirectUri must have a path, got \"$redirectUri\""
+    }
+  }
+
   private val httpClient =
     HttpClient(Android) {
       install(ContentNegotiation) {
@@ -163,10 +184,6 @@ class IduraVerify(
   private val browserFlowSlot = BrowserFlowSlot<Uri>()
 
   init {
-    require(redirectUri.scheme == "https") {
-      "redirectUri must use https scheme"
-    }
-
     // ActivityResultRegistry.register silently hands an existing key's callbacks to the new
     // registration, which would leave a displaced instance's in-flight login suspended forever.
     // Claim our keys up front so the collision fails at construction instead. Before the
