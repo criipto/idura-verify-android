@@ -9,10 +9,10 @@ import net.openid.appauth.AuthorizationException
  *
  * Programming errors detected during construction (`IllegalArgumentException`,
  * `IllegalStateException`) are not wrapped — they continue to use Java's standard exception
- * types because they indicate caller bugs, not runtime conditions. The two state preconditions
- * the SDK enforces have their own `IllegalStateException` subclasses, [DuplicateInstanceException]
- * and [BrowserFlowInProgressException], so that a consumer wrapping the SDK can tell them apart
- * from each other and from an unrecognised failure without matching on message strings.
+ * types because they indicate caller bugs, not runtime conditions. The one state precondition the
+ * constructor enforces has its own `IllegalStateException` subclass, [DuplicateInstanceException],
+ * so that a consumer wrapping the SDK can tell it apart from an unrecognised failure without
+ * matching on message strings.
  */
 abstract class IduraVerifyException(
   message: String,
@@ -41,6 +41,16 @@ class UserCancelledException(
  * No browser on the device is capable of running the authentication flow.
  */
 class NoSuitableBrowserException : IduraVerifyException("No suitable browser found")
+
+/**
+ * A login started from this [IduraVerify] instance has not returned yet, and only one can be in
+ * flight at a time: the browser result handlers have no way to tell which of several pending
+ * logins a result belongs to. The overlapping call is rejected before the SDK makes any network
+ * request, and the login already running is untouched — await its result instead of starting
+ * another one.
+ */
+class LoginAlreadyInProgressException internal constructor() :
+  IduraVerifyException("A login is already in progress")
 
 /**
  * The authorization server returned an OAuth/OIDC error response. The [error] code corresponds
@@ -81,18 +91,6 @@ class IduraVerifyInternalException(
  * it carries no `traceId` because no span exists yet.
  */
 class DuplicateInstanceException internal constructor(
-  message: String,
-) : IllegalStateException(message)
-
-/**
- * A browser flow started by this instance has not finished yet. Only one can be in flight at a
- * time, because the activity result handlers have no way to tell which of several pending calls a
- * given result belongs to. Wait for the outstanding [IduraVerify.login] to return.
- *
- * Deliberately not an [IduraVerifyException]: overlapping calls are a caller bug rather than a
- * runtime condition, so it stays a standard [IllegalStateException].
- */
-class BrowserFlowInProgressException internal constructor(
   message: String,
 ) : IllegalStateException(message)
 

@@ -13,14 +13,17 @@ import kotlin.coroutines.resumeWithException
  *
  * [resume] and [fail] report whether a flow was actually waiting, so callers can tell a delivered
  * result apart from a dropped one.
+ *
+ * [IduraVerify.login] turns an overlapping login away much earlier, before the PAR request, with
+ * [LoginAlreadyInProgressException]. The check in [run] is the invariant behind that guard, and
+ * only fires for flows that do not go through it — a logout overlapping a login, say. It stays a
+ * plain [IllegalStateException]: consumers are handed the typed rejection, not this one.
  */
 internal class BrowserFlowSlot<T> {
   private var continuation: CancellableContinuation<T>? = null
 
   suspend fun run(launch: () -> Unit): T {
-    if (continuation != null) {
-      throw BrowserFlowInProgressException("Another browser flow is already in progress")
-    }
+    check(continuation == null) { "Another browser flow is already in progress" }
     try {
       return suspendCancellableCoroutine { cont ->
         continuation = cont
