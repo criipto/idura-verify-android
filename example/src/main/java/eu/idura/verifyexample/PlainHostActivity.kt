@@ -34,8 +34,8 @@ private data class MockData(
  * - forward [onActivityResult] to [IduraVerify.handleActivityResult], since with no activity result
  *   registry to register against the SDK launches the browser through `startActivityForResult`.
  *
- * Deliberately not a launcher activity and not reachable from [MainActivity]: it exists for the
- * instrumented tests to drive, and a second launcher activity would make `startApp` ambiguous for
+ * Deliberately not a launcher activity and not reachable from [MainActivity]: it exists for
+ * `PlainHostLoginTest` to drive, and a second launcher activity would make `startApp` ambiguous for
  * the tests that drive the Compose UI. It lives in `main` rather than `androidTest` so that it ships
  * inside the app APK and CI's minified release build covers it. See the example README for how to
  * run it.
