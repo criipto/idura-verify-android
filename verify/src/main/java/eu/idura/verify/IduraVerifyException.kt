@@ -9,7 +9,10 @@ import net.openid.appauth.AuthorizationException
  *
  * Programming errors detected during construction (`IllegalArgumentException`,
  * `IllegalStateException`) are not wrapped — they continue to use Java's standard exception
- * types because they indicate caller bugs, not runtime conditions.
+ * types because they indicate caller bugs, not runtime conditions. The two state preconditions
+ * the SDK enforces have their own `IllegalStateException` subclasses, [DuplicateInstanceException]
+ * and [BrowserFlowInProgressException], so that a consumer wrapping the SDK can tell them apart
+ * from each other and from an unrecognised failure without matching on message strings.
  */
 abstract class IduraVerifyException(
   message: String,
@@ -68,6 +71,30 @@ class IduraVerifyInternalException(
   message: String,
   cause: Throwable? = null,
 ) : IduraVerifyException(message, cause)
+
+/**
+ * A second [IduraVerify] with this clientID and domain is already active on this activity. Both
+ * would deliver their browser results against the same activity result keys, so the constructor
+ * rejects the later one; give it a distinct clientID or domain, or reuse the live instance.
+ *
+ * Deliberately not an [IduraVerifyException]: this is a caller bug detected at construction, and
+ * it carries no `traceId` because no span exists yet.
+ */
+class DuplicateInstanceException internal constructor(
+  message: String,
+) : IllegalStateException(message)
+
+/**
+ * A browser flow started by this instance has not finished yet. Only one can be in flight at a
+ * time, because the activity result handlers have no way to tell which of several pending calls a
+ * given result belongs to. Wait for the outstanding [IduraVerify.login] to return.
+ *
+ * Deliberately not an [IduraVerifyException]: overlapping calls are a caller bug rather than a
+ * runtime condition, so it stays a standard [IllegalStateException].
+ */
+class BrowserFlowInProgressException internal constructor(
+  message: String,
+) : IllegalStateException(message)
 
 /**
  * Translates AppAuth's [AuthorizationException] from the Custom Tab path into the SDK's own

@@ -97,7 +97,7 @@ class ActivityResultRegistrationTest {
       scenario.onActivity { activity ->
         newIduraVerify(activity)
 
-        assertThrows(IllegalStateException::class.java) { newIduraVerify(activity) }
+        assertThrows(DuplicateInstanceException::class.java) { newIduraVerify(activity) }
 
         // The rejected instance claimed nothing: the first one's launchers are intact.
         assertEquals(2, activity.activityResultRegistry.iduraKeys().size)

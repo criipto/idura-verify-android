@@ -18,7 +18,9 @@ internal class BrowserFlowSlot<T> {
   private var continuation: CancellableContinuation<T>? = null
 
   suspend fun run(launch: () -> Unit): T {
-    check(continuation == null) { "Another browser flow is already in progress" }
+    if (continuation != null) {
+      throw BrowserFlowInProgressException("Another browser flow is already in progress")
+    }
     try {
       return suspendCancellableCoroutine { cont ->
         continuation = cont
