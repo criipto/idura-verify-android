@@ -109,6 +109,8 @@ println(result.traceId)
 
 `login()` returns a `LoginResult` containing the verified `jwt` and the `traceId` for the login flow. You can inspect traces in the Idura dashboard.
 
+Only one login can be in flight per SDK instance, because a browser result carries nothing that says which of several pending logins it belongs to. Calling `login()` while an earlier call has not returned throws `LoginAlreadyInProgressException` before any network request is made, and the login already running is unaffected. Disable your login button while the call is outstanding rather than relying on the rejection.
+
 A login only lives as long as the activity it was started from. If the activity is recreated while the user is in the browser — a rotation, or Android reclaiming your process while it is in the background — the call is lost and `login()` never returns. The browser tab itself survives, so the user can still complete the flow there, but the result has nowhere to go and is discarded. Start a new login when the user comes back rather than waiting for the old one.
 
 The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method:
@@ -131,6 +133,7 @@ val streetAddress = result.jwt.getClaimAsMap("address")?.get("street_address") a
 
 ```kt
 import eu.idura.verify.IduraVerifyException
+import eu.idura.verify.LoginAlreadyInProgressException
 import eu.idura.verify.NoSuitableBrowserException
 import eu.idura.verify.OAuthException
 import eu.idura.verify.UserCancelledException
@@ -143,6 +146,9 @@ try {
   // action — quietly return them to the previous screen rather than showing an error.
 } catch (ex: NoSuitableBrowserException) {
   // No browser on the device can run the auth flow.
+} catch (ex: LoginAlreadyInProgressException) {
+  // A login from this instance is still running. Nothing was started — leave the running
+  // login to finish.
 } catch (ex: OAuthException) {
   // The IdP returned a non-cancellation OAuth error. `ex.error` is the OAuth 2.0 error code,
   // `ex.errorDescription` is the optional human-readable text.

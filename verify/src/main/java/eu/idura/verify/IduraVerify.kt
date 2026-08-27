@@ -50,6 +50,7 @@ import net.openid.appauth.browser.BrowserSelector
 import net.openid.appauth.browser.Browsers
 import net.openid.appauth.browser.VersionedBrowserMatcher
 import java.util.WeakHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -182,6 +183,15 @@ class IduraVerify(
   // flight the slot holds no continuation, so such a replay is dropped, which is what we want —
   // the coroutine that was waiting for it died with the process.
   private val browserFlowSlot = BrowserFlowSlot<Uri>()
+
+  /**
+   * Held for the whole of [login], from before the PAR request until the result is in hand, so an
+   * overlapping call is turned away with [LoginAlreadyInProgressException] rather than spending a
+   * round trip on a login that could never reach the browser. Atomic because [login] is a suspend
+   * function a consumer may call from any dispatcher, and two racing calls both getting past the
+   * check is the one thing it exists to prevent.
+   */
+  private val loginInProgress = AtomicBoolean(false)
 
   init {
     // ActivityResultRegistry.register silently hands an existing key's callbacks to the new
@@ -493,12 +503,18 @@ class IduraVerify(
    *
    * The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method.
    *
+   * Only one login can be in flight per instance. Calling this while an earlier call has not
+   * returned yet rejects the new call and leaves the running one alone.
+   *
    * @param eid The eID to login with.
    * @param prompt The OIDC prompt, see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
    *
    * @return A [LoginResult] containing the verified JWT and the OpenTelemetry trace ID for the
    *   login flow. On failure, an [IduraVerifyException] is thrown with the trace ID available
    *   on [IduraVerifyException.traceId].
+   *
+   * @throws LoginAlreadyInProgressException if a login started from this instance has not
+   *   returned yet. Thrown before any network request is made.
    *
    * @sample eu.idura.verify.samples.loginSample1
    */
@@ -513,6 +529,14 @@ class IduraVerify(
       .setNoParent()
       .startAndRun { span ->
         val traceId = span.spanContext.traceId
+
+        // Ahead of the PAR request, and of everything else the flow does: an overlapping login
+        // could never be handed a browser result, so it is turned away before it costs the
+        // consumer a network round trip. Outside the `try` below, so the rejected call does not
+        // run the `finally` that releases the claim the running login holds.
+        if (!loginInProgress.compareAndSet(false, true)) {
+          throw LoginAlreadyInProgressException().also { it.traceId = traceId }
+        }
 
         try {
           if (!foundASuitableBrowser) {
@@ -576,6 +600,10 @@ class IduraVerify(
         } catch (ex: IduraVerifyException) {
           ex.traceId = traceId
           throw ex
+        } finally {
+          // Every exit releases the claim — a returned result, a failure, and the cancellation
+          // that arrives when the activity is torn down mid-login — so the next login can claim it.
+          loginInProgress.set(false)
         }
       }
 
