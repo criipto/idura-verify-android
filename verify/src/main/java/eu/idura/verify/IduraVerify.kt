@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.auth.AuthTabIntent.AuthResult
@@ -97,12 +98,33 @@ enum class Action {
   Sign,
 }
 
-class IduraVerify(
+class IduraVerify private constructor(
   private val clientID: String,
   private val domain: String,
-  private val redirectUri: Uri = "https://$domain/android/callback".toUri(),
+  private val redirectUri: Uri,
   private val activity: ComponentActivity,
+  private val lifecycleOwner: LifecycleOwner,
+  private val activityResultRegistry: ActivityResultRegistry,
 ) : DefaultLifecycleObserver {
+  /**
+   * Construct against a [ComponentActivity], which is both the lifecycle owner and the source of
+   * the activity result registry the browser result comes back through. Nothing further is
+   * required of the host.
+   */
+  constructor(
+    clientID: String,
+    domain: String,
+    redirectUri: Uri = "https://$domain/android/callback".toUri(),
+    activity: ComponentActivity,
+  ) : this(
+    clientID = clientID,
+    domain = domain,
+    redirectUri = redirectUri,
+    activity = activity,
+    lifecycleOwner = activity,
+    activityResultRegistry = activity.activityResultRegistry,
+  )
+
   // Ahead of the property initializers below, because `Tracing` starts an exporter thread and
   // nothing shuts it down if construction fails afterwards: `onDestroy` only runs once we have
   // registered as a lifecycle observer, which happens later still.
@@ -171,9 +193,9 @@ class IduraVerify(
     tracing.getTracer(BuildConfig.LIBRARY_PACKAGE_NAME, BuildConfig.VERSION)
 
   private var browserDescription: String? = null
-  private val getIduraJWKS = cacheResult(activity.lifecycleScope, this::loadIduraJWKS)
+  private val getIduraJWKS = cacheResult(lifecycleOwner.lifecycleScope, this::loadIduraJWKS)
   private val getIduraOIDCConfiguration =
-    cacheResult(activity.lifecycleScope, this::loadIduraOIDCConfiguration)
+    cacheResult(lifecycleOwner.lifecycleScope, this::loadIduraOIDCConfiguration)
 
   private var foundASuitableBrowser = false
 
@@ -193,25 +215,25 @@ class IduraVerify(
         "active on this activity. Reuse that instance instead of constructing another."
     }
 
-    activity.lifecycle.addObserver(this)
+    lifecycleOwner.lifecycle.addObserver(this)
 
     // Register against the registry directly rather than via
     // `ComponentActivity.registerForActivityResult`, which refuses to register once the activity
-    // is STARTED. That check exists to keep the request codes it generates from `activity_rq#<n>`
+    // is STARTED. That check exists to keep the keys it generates as `activity_rq#<n>`
     // reproducible across process death, which only holds if every launcher in the activity is
     // registered unconditionally and in the same order every time. Supplying our own keys gives us
     // that stability without the constructor having to run before the activity starts, which
     // consumers embedding us in Flutter or React Native cannot arrange. In exchange we own the
     // unregistering, see `onDestroy`.
     authTabIntentLauncher =
-      activity.activityResultRegistry.register(
+      activityResultRegistry.register(
         authTabLauncherKey,
         AuthTabIntent.AuthenticateUserResultContract(),
         this::handleAuthTabResult,
       )
 
     customTabIntentLauncher =
-      activity.activityResultRegistry.register(
+      activityResultRegistry.register(
         customTabLauncherKey,
         object :
           ActivityResultContract<Pair<AuthorizationManagementRequest, Uri>, CustomTabResult>() {
@@ -281,7 +303,7 @@ class IduraVerify(
       )
 
     // Load the OIDC config and JWKS configuration, so it is ready when the user initiates a login
-    activity.lifecycleScope.launch {
+    lifecycleOwner.lifecycleScope.launch {
       async { runCatching { getIduraOIDCConfiguration() } }
       async { runCatching { getIduraJWKS() } }
     }
