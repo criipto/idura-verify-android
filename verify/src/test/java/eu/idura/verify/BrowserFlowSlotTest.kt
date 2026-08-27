@@ -52,7 +52,10 @@ class BrowserFlowSlotTest {
         } catch (e: Throwable) {
           e
         }
-      assertTrue("expected IllegalStateException, got $ex", ex is IllegalStateException)
+      assertTrue(
+        "expected BrowserFlowInProgressException, got $ex",
+        ex is BrowserFlowInProgressException,
+      )
 
       slot.resume("done")
       first.await()

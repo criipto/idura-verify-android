@@ -85,7 +85,7 @@ class LoginActivity : ComponentActivity() {
 
 You are not restricted to that, though. The SDK can be constructed at any point in the activity's lifecycle, including after it has started.
 
-If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with an `IllegalStateException`.
+If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with a `DuplicateInstanceException`.
 
 ### A word about redirect URLs
 

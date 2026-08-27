@@ -188,9 +188,11 @@ class IduraVerify(
     // registration, which would leave a displaced instance's in-flight login suspended forever.
     // Claim our keys up front so the collision fails at construction instead. Before the
     // lifecycle observer below, so a rejected instance leaves nothing behind.
-    check(liveLauncherKeys.getOrPut(activity) { mutableSetOf() }.add(authTabLauncherKey)) {
-      "An IduraVerify instance for clientID \"$clientID\" and domain \"$domain\" is already " +
-        "active on this activity. Reuse that instance instead of constructing another."
+    if (!liveLauncherKeys.getOrPut(activity) { mutableSetOf() }.add(authTabLauncherKey)) {
+      throw DuplicateInstanceException(
+        "An IduraVerify instance for clientID \"$clientID\" and domain \"$domain\" is already " +
+          "active on this activity. Reuse that instance instead of constructing another.",
+      )
     }
 
     activity.lifecycle.addObserver(this)
