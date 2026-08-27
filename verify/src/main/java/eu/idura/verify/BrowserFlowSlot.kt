@@ -17,6 +17,13 @@ import kotlin.coroutines.resumeWithException
 internal class BrowserFlowSlot<T> {
   private var continuation: CancellableContinuation<T>? = null
 
+  /**
+   * Whether a flow is currently parked here waiting for a result. Lets a caller that knows a result
+   * must already have arrived tell that it never did, see [IduraVerify.onResume].
+   */
+  val isAwaiting: Boolean
+    get() = continuation != null
+
   suspend fun run(launch: () -> Unit): T {
     check(continuation == null) { "Another browser flow is already in progress" }
     try {

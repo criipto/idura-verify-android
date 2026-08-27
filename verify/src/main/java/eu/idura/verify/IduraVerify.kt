@@ -1,17 +1,20 @@
 package eu.idura.verify
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.auth.AuthTabIntent.AuthResult
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.core.net.toUri
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.auth0.jwt.exceptions.JWTVerificationException
@@ -102,7 +105,7 @@ class IduraVerify private constructor(
   private val clientID: String,
   private val domain: String,
   private val redirectUri: Uri,
-  private val activity: ComponentActivity,
+  private val activity: Activity,
   private val lifecycleOwner: LifecycleOwner,
   private val activityResultRegistry: ActivityResultRegistry,
 ) : DefaultLifecycleObserver {
@@ -123,6 +126,58 @@ class IduraVerify private constructor(
     activity = activity,
     lifecycleOwner = activity,
     activityResultRegistry = activity.activityResultRegistry,
+  )
+
+  /**
+   * Construct against any [Activity]. Which machinery the browser result comes back through follows
+   * the activity in hand: one that offers an activity result registry — every [ComponentActivity],
+   * and any other [ActivityResultRegistryOwner] — has its own used, and an activity that offers none
+   * is launched through [Activity.startActivityForResult], which the host has to route back by
+   * forwarding its `onActivityResult` to [handleActivityResult]. Without that forwarding a login
+   * never returns.
+   *
+   * Forwarding to an instance whose activity did turn out to own a registry is a no-op, so a caller
+   * that cannot know the runtime type — a plugin handed an `Activity` — should forward
+   * unconditionally.
+   *
+   * @param lifecycleOwner The lifecycle the instance follows, which is the host activity's own
+   *   wherever the activity is a [LifecycleOwner]. Defaults to
+   *   [activity], and has to be passed explicitly for an activity that is not one.
+   */
+  constructor(
+    clientID: String,
+    domain: String,
+    redirectUri: Uri = "https://$domain/android/callback".toUri(),
+    activity: Activity,
+    lifecycleOwner: LifecycleOwner =
+      activity as? LifecycleOwner
+        ?: throw IllegalArgumentException(
+          "$activity is not a LifecycleOwner, so lifecycleOwner has to be passed explicitly",
+        ),
+  ) : this(
+    clientID = clientID,
+    domain = domain,
+    redirectUri = redirectUri,
+    activity = activity,
+    lifecycleOwner = lifecycleOwner,
+    // Decided on the activity in hand rather than on the type the call site declared, so that an
+    // activity reaching this constructor through an `Activity`-typed reference — which is all an
+    // embedding framework's plugin is handed — behaves the same as it would through the one above. That also
+    // keeps a host's choice of base class from quietly deciding whether forwarding is load-bearing.
+    //
+    // On the interface rather than on `ComponentActivity`, which is the only Activity in androidx
+    // implementing it but not the only one that can: a host offering a registry gets it used, rather
+    // than silently bypassed in favour of ours — which would then need the `onActivityResult`
+    // forwarding such a host has no reason to be doing.
+    activityResultRegistry =
+      (activity as? ActivityResultRegistryOwner)?.activityResultRegistry
+        ?: HostActivityResultRegistry(
+          activity,
+          listOf(
+            authTabLauncherKeyFor(domain, clientID),
+            customTabLauncherKeyFor(domain, clientID),
+          ),
+        ),
   )
 
   // Ahead of the property initializers below, because `Tracing` starts an exporter thread and
@@ -185,8 +240,8 @@ class IduraVerify private constructor(
    * instances can share one activity; two instances configured identically would collide, so the
    * constructor rejects the second one, see [liveLauncherKeys].
    */
-  private val authTabLauncherKey = "eu.idura.verify.authTab:$domain:$clientID"
-  private val customTabLauncherKey = "eu.idura.verify.customTab:$domain:$clientID"
+  private val authTabLauncherKey = authTabLauncherKeyFor(domain, clientID)
+  private val customTabLauncherKey = customTabLauncherKeyFor(domain, clientID)
 
   private val tracing = Tracing(domain)
   private val tracer =
@@ -206,10 +261,12 @@ class IduraVerify private constructor(
   private val browserFlowSlot = BrowserFlowSlot<Uri>()
 
   init {
-    // ActivityResultRegistry.register silently hands an existing key's callbacks to the new
-    // registration, which would leave a displaced instance's in-flight login suspended forever.
-    // Claim our keys up front so the collision fails at construction instead. Before the
-    // lifecycle observer below, so a rejected instance leaves nothing behind.
+    // Two identically configured instances on one activity would take each other's browser
+    // results, leaving a displaced instance's in-flight login suspended forever: sharing the host's
+    // registry, the later `register` silently inherits the earlier one's callbacks, and on our own
+    // registry both instances derive the same request codes out of the same keys. Claim our keys up
+    // front so either collision fails at construction instead. Before the lifecycle observer
+    // below, so a rejected instance leaves nothing behind.
     check(liveLauncherKeys.getOrPut(activity) { mutableSetOf() }.add(authTabLauncherKey)) {
       "An IduraVerify instance for clientID \"$clientID\" and domain \"$domain\" is already " +
         "active on this activity. Reuse that instance instead of constructing another."
@@ -223,7 +280,7 @@ class IduraVerify private constructor(
     // reproducible across process death, which only holds if every launcher in the activity is
     // registered unconditionally and in the same order every time. Supplying our own keys gives us
     // that stability without the constructor having to run before the activity starts, which
-    // consumers embedding us in Flutter or React Native cannot arrange. In exchange we own the
+    // consumers embedding us in a cross-platform framework cannot arrange. In exchange we own the
     // unregistering, see `onDestroy`.
     authTabIntentLauncher =
       activityResultRegistry.register(
@@ -417,6 +474,30 @@ class IduraVerify private constructor(
     }
   }
 
+  override fun onResume(owner: LifecycleOwner) {
+    // Android hands an activity its `onActivityResult` before `onResume`, and the result handlers
+    // clear the slot synchronously while the result is being dispatched. So a login still parked in
+    // the slot as the host resumes means no result reached us, and where we brought our own registry
+    // the overwhelmingly likely reason is a host that never forwards `onActivityResult` — a host
+    // whose own registry we are using cannot have that bug, it does the routing itself.
+    //
+    // The resume the browser was launched from does not trip this: a login starts from user
+    // interaction, so the host is already RESUMED by the time the slot fills, and it only resumes
+    // again after having paused for the browser.
+    //
+    // A warning and nothing more, because a resume with a login genuinely still in flight does
+    // happen — split screen resumes us alongside the browser, and a login started before the host
+    // ever resumed lands here too. Failing that login would be worse than a stray log line.
+    if (activityResultRegistry is HostActivityResultRegistry && browserFlowSlot.isAwaiting) {
+      Log.w(
+        TAG,
+        "Resumed while still awaiting a browser result — is the host forwarding " +
+          "onActivityResult to IduraVerify.handleActivityResult()? Without that, login() never " +
+          "returns.",
+      )
+    }
+  }
+
   override fun onDestroy(owner: LifecycleOwner) {
     // Registering with our own key installs no lifecycle observer, so nothing releases the
     // callbacks for us. Left registered they would keep this instance, and everything it holds,
@@ -433,6 +514,24 @@ class IduraVerify private constructor(
     tracing.close()
     httpClient.close()
   }
+
+  /**
+   * Hand the SDK a result from the host activity's `onActivityResult`. Only needed when the host
+   * activity offers no activity result registry of its own — every [ComponentActivity] does, as does
+   * any other [ActivityResultRegistryOwner], and such a host routes results to the SDK through it.
+   * On that path this returns `false` for every request code rather than delivering the result a
+   * second time, so forwarding is safe from a host that cannot know which of the two it is.
+   *
+   * @return whether the request code belonged to this instance, which is what an `onActivityResult`
+   *   override needs in order to decide whether to handle the result itself.
+   */
+  fun handleActivityResult(
+    requestCode: Int,
+    resultCode: Int,
+    data: Intent?,
+  ): Boolean =
+    activityResultRegistry is HostActivityResultRegistry &&
+      activityResultRegistry.dispatchResult(requestCode, resultCode, data)
 
   private fun handleResultUri(uri: Uri) {
     if (!browserFlowSlot.resume(uri)) {
@@ -509,6 +608,26 @@ class IduraVerify private constructor(
   }
 
   /**
+   * A lifecycle still sitting at INITIALIZED never dispatched ON_CREATE, so [onCreate] never ran and
+   * there is neither a tab type, an authorization service nor a browser to work with. Left to fail
+   * on its own the flow would blame the device — `foundASuitableBrowser` is false, so a login throws
+   * [NoSuitableBrowserException] — and send a consumer whose hand-driven `LifecycleRegistry` is the
+   * real problem off checking browser installs.
+   *
+   * An [IllegalStateException] rather than an [IduraVerifyException], for the same reason the
+   * constructor's checks are: this is a wiring bug in the host, deterministic from the very first
+   * call, and it is meant to reach whoever is building the integration. Wrapped as an SDK exception
+   * it would instead land in the consumer's "login failed" handler and be shown to the user.
+   */
+  private fun checkLifecycleWasDriven() {
+    check(lifecycleOwner.lifecycle.currentState != Lifecycle.State.INITIALIZED) {
+      "The lifecycle passed to IduraVerify never reached CREATED, so the SDK could not " +
+        "initialize — is your LifecycleRegistry being driven from the activity's lifecycle " +
+        "callbacks?"
+    }
+  }
+
+  /**
    * Start a login, returning the verified ID token and the trace ID for the login flow.
    *
    * The SDK provides builder classes for some of the eIDs supported by Idura Verify. You should use these when possible, since they provide helper methods for the scopes and login hints supported by the specific eID provider. For example, Danish MitID supports SSN prefilling, which you can access using the `prefillSsn` method.
@@ -535,6 +654,8 @@ class IduraVerify private constructor(
         val traceId = span.spanContext.traceId
 
         try {
+          checkLifecycleWasDriven()
+
           if (!foundASuitableBrowser) {
             throw NoSuitableBrowserException()
           }
@@ -683,6 +804,8 @@ class IduraVerify private constructor(
       ).setNoParent()
       .startAndRun { span ->
         try {
+          checkLifecycleWasDriven()
+
           val endSessionRequest =
             EndSessionRequest
               .Builder(
@@ -876,13 +999,28 @@ class IduraVerify private constructor(
   private companion object {
     /**
      * The launcher keys live instances hold, per activity. Lets the constructor reject a second
-     * identically configured instance, whose registration would otherwise silently displace the
-     * first one's result callbacks. Claimed keys are released in [onDestroy]; the weak keys cover
-     * activities that are destroyed without it running.
+     * identically configured instance, which would otherwise silently take the first one's browser
+     * results. Claimed keys are released in [onDestroy]; the weak keys cover activities that are
+     * destroyed without it running.
      */
-    val liveLauncherKeys = WeakHashMap<ComponentActivity, MutableSet<String>>()
+    val liveLauncherKeys = WeakHashMap<Activity, MutableSet<String>>()
   }
 }
+
+/**
+ * The keys the SDK's launchers are filed under, derived so that [HostActivityResultRegistry] can
+ * bind their request codes before the constructor gets far enough to register anything.
+ */
+internal fun authTabLauncherKeyFor(
+  domain: String,
+  clientID: String,
+) = "eu.idura.verify.authTab:$domain:$clientID"
+
+/** See [authTabLauncherKeyFor]. */
+internal fun customTabLauncherKeyFor(
+  domain: String,
+  clientID: String,
+) = "eu.idura.verify.customTab:$domain:$clientID"
 
 internal fun <T> cacheResult(
   scope: CoroutineScope,

@@ -4,5 +4,14 @@
         <activity
             android:name="eu.idura.verify.TestHostActivity"
             android:exported="false" />
+        <activity
+            android:name="eu.idura.verify.TestPlainHostActivity"
+            android:exported="false" />
+        <activity
+            android:name="eu.idura.verify.TestRegistryOwnerHostActivity"
+            android:exported="false" />
+        <activity
+            android:name="eu.idura.verify.TestNonLifecycleHostActivity"
+            android:exported="false" />
     </application>
 </manifest>
