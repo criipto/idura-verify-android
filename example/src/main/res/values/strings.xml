@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Idura Verify example</string>
+
+    <!-- Shared between the Compose screen and PlainHostActivity's layout, so the instrumented
+         tests assert on one set of labels across both hosts. logging_in is plain-host only: the
+         Compose screen shows a spinner instead. -->
+    <string name="login_with_mock">Login with Mock</string>
+    <string name="login_with_mitid">Login with MitID</string>
+    <string name="logging_in">Logging in…</string>
+    <string name="logged_in">Logged in!</string>
+    <string name="using_tab_type">Using %1$s</string>
 </resources>

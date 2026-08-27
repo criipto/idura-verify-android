@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -141,7 +142,7 @@ fun LoggedInScreen(
           horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           Spacer(modifier = Modifier.height(300.dp))
-          Text(text = "Logged in!", fontSize = 30.sp)
+          Text(text = stringResource(R.string.logged_in), fontSize = 30.sp)
           Spacer(modifier = Modifier.height(50.dp))
 
           Text(
@@ -218,7 +219,7 @@ fun LoginScreen(
           val buttonModifier = Modifier.fillMaxWidth()
 
           Text(text = "Login", fontSize = 30.sp)
-          Text(text = "Using ${BuildConfig.TAB_TYPE}")
+          Text(text = stringResource(R.string.using_tab_type, BuildConfig.TAB_TYPE))
           Spacer(modifier = Modifier.height(50.dp))
 
           val errorMessage = loginState.errorMessage
@@ -234,7 +235,7 @@ fun LoginScreen(
           Button(onClick = {
             onLogin?.invoke(Mock().withMockData(MockData(name = "foobar")))
           }, modifier = buttonModifier) {
-            Text(text = "Login with Mock")
+            Text(text = stringResource(R.string.login_with_mock))
           }
 
           Button(onClick = {
@@ -244,7 +245,7 @@ fun LoginScreen(
                 .withMessage("hello!"),
             )
           }, modifier = buttonModifier) {
-            Text(text = "Login with MitID")
+            Text(text = stringResource(R.string.login_with_mitid))
           }
 
           Button(onClick = {
