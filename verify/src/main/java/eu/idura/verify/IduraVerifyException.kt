@@ -7,12 +7,14 @@ import net.openid.appauth.AuthorizationException
  * failure uniformly, or catch a more specific subclass to distinguish e.g. user cancellation
  * from a real error.
  *
- * Programming errors detected during construction (`IllegalArgumentException`,
- * `IllegalStateException`) are not wrapped — they continue to use Java's standard exception
- * types because they indicate caller bugs, not runtime conditions. The one state precondition the
- * constructor enforces has its own `IllegalStateException` subclass, [DuplicateInstanceException],
- * so that a consumer wrapping the SDK can tell it apart from an unrecognised failure without
- * matching on message strings.
+ * Errors in how the consumer wired the SDK up — a misconfigured domain, a host lifecycle that is
+ * never driven — are not wrapped, whether they are detected at construction or on the first call.
+ * They continue to use Java's standard exception types (`IllegalArgumentException`,
+ * `IllegalStateException`) because they indicate caller bugs, not runtime conditions, and so want
+ * to reach the developer rather than the consumer's error handling for a failed login. The one
+ * state precondition the constructor enforces has its own `IllegalStateException` subclass,
+ * [DuplicateInstanceException], so that a consumer wrapping the SDK can tell it apart from an
+ * unrecognised failure without matching on message strings.
  */
 abstract class IduraVerifyException(
   message: String,

@@ -21,3 +21,16 @@ Note that eIDs which use authenticator apps (Danish MitID, Swedish and Norwegian
 8. :tada:
 
 The mock provider works out of the box, but other eID providers require you to register test users before you can run a login. See https://docs.idura.app/verify/e-ids/.
+
+## The plain-`Activity` host
+
+`MainActivity` is a `ComponentActivity`, which is what most apps have and what needs no extra work from you. `PlainHostActivity` is the same login on a plain `android.app.Activity`, where the host must drive its own `Lifecycle` and forward `onActivityResult` to the SDK. It is the smallest complete example of that path; see the SDK README section on hosts that are not a `ComponentActivity`.
+
+It has no launcher icon and nothing in the app links to it: it exists for `PlainHostLoginTest` to drive, and a second launcher activity would make the other instrumented tests ambiguous about which host they started. So run it through that test:
+
+```sh
+./gradlew :example:connectedCustomTabDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=eu.idura.verifyexample.PlainHostLoginTest
+```
+
+To poke at it by hand instead, set `android:exported="true"` on it in `AndroidManifest.xml` and then `adb shell am start -n eu.idura.verifyexample/.PlainHostActivity`. Don't commit that — the shell user cannot start an unexported activity, which is the only reason the flag would need changing.

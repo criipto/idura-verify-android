@@ -103,6 +103,42 @@ class BrowserFlowSlotTest {
     }
 
   @Test
+  fun `isAwaiting follows whether a flow is parked in the slot`() =
+    runTest {
+      val slot = BrowserFlowSlot<String>()
+      assertFalse(slot.isAwaiting)
+
+      val flow = async { slot.run { } }
+      testScheduler.runCurrent()
+      assertTrue(slot.isAwaiting)
+
+      slot.resume("ok")
+      flow.await()
+      assertFalse(slot.isAwaiting)
+    }
+
+  /**
+   * A flow that ended in an exception or a cancellation leaves the slot empty too, so nothing can
+   * read a dead flow as one still waiting for a result.
+   */
+  @Test
+  fun `isAwaiting is false once the flow has ended, however it ended`() =
+    runTest {
+      val slot = BrowserFlowSlot<String>()
+
+      val failed = async { runCatching { slot.run { } } }
+      testScheduler.runCurrent()
+      slot.fail(Exception("boom"))
+      failed.await()
+      assertFalse(slot.isAwaiting)
+
+      val cancelled = async { slot.run { } }
+      testScheduler.runCurrent()
+      cancelled.cancelAndJoin()
+      assertFalse(slot.isAwaiting)
+    }
+
+  @Test
   fun `resume is a no-op when no flow is in progress`() =
     runTest {
       val slot = BrowserFlowSlot<String>()

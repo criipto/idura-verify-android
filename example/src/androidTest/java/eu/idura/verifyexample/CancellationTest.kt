@@ -2,7 +2,6 @@ package eu.idura.verifyexample
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import androidx.test.uiautomator.textAsString
 import androidx.test.uiautomator.uiAutomator
@@ -22,14 +21,6 @@ class CancellationTest {
   // timing race doesn't fail the whole run.
   @get:Rule
   val rules: RuleChain = RuleChain.outerRule(CaptureOnFailure()).around(RetryRule())
-
-  /** Closes the Chrome Custom Tab via its "X"; the SDK treats this as cancellation. */
-  private fun UiDevice.closeBrowserTab() {
-    val close =
-      wait(Until.findObject(By.desc("Close tab")), 5_000)
-        ?: error("Chrome 'Close tab' button not found")
-    close.click()
-  }
 
   @Test
   fun runMitIDCancelByClosingBrowser() {

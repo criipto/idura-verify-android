@@ -87,6 +87,35 @@ You are not restricted to that, though. The SDK can be constructed at any point 
 
 If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with a `DuplicateInstanceException`.
 
+### Hosts that are not a `ComponentActivity`
+
+This section is mostly relevant for plugin implementers (Flutter, MAUI etc.) or consumers who do not use AndroidX or Compose. You should only reach for it if you encounter errors about missing lifecycle callbacks, or `onActivityResult` forwarding.
+
+A `ComponentActivity` — which `AppCompatActivity` and `FragmentActivity` both are — needs nothing beyond what is mentioned in the "Initialization" section. The SDK receives the browser result through the activity's own activity result registry. So does any other host that implements `ActivityResultRegistryOwner`.
+
+Activities that do not implement `ActivityResultRegistryOwner` must manually forward an activity result to the SDK:
+
+```kt
+val iduraVerify = IduraVerify(
+  BuildConfig.IDURA_CLIENT_ID,
+  BuildConfig.IDURA_DOMAIN,
+  activity = this,
+)
+
+override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+  if (iduraVerify.handleActivityResult(requestCode, resultCode, data)) {
+    return
+  }
+  super.onActivityResult(requestCode, resultCode, data)
+}
+```
+
+`handleActivityResult` returns whether the result was one the SDK asked for. Forwarding is always safe: against an activity that owns a registry the SDK is already receiving results through it, and the call is a no-op returning `false`.
+
+The SDK follows the activity's lifecycle, so the activity has to implement `LifecycleOwner` — every `ComponentActivity` already does. An activity that does not implement it is rejected with an `IllegalArgumentException`.
+
+That registry has to actually be driven, or the SDK never initializes and `login()` fails with an `IllegalStateException` saying so. [`PlainHostActivity`](example/src/main/java/eu/idura/verifyexample/PlainHostActivity.kt) in the example app shows how to manually implement `LifecycleOwner` and how to forward activity results.
+
 ### A word about redirect URLs
 
 In order for redirect URLs to work, your app needs to prove that it is authorized to capture the URL. This is done by using [App Links](https://developer.android.com/training/app-links/about). When you use your Idura domain, Idura manages this for you, as long as you configure your package name and the fingerprint of your signing key in the Idura dashboard.

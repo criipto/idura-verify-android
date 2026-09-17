@@ -19,6 +19,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--
+            Hosts the SDK on a plain android.app.Activity, for the instrumented tests to drive; see
+            its KDoc. No LAUNCHER filter, so that startApp() still resolves unambiguously to
+            MainActivity. Not exported either — the instrumentation shares the app's UID and starts
+            it directly.
+        -->
+        <activity
+            android:name=".PlainHostActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.IduraVerifyAndroid" />
     </application>
 
 </manifest>
