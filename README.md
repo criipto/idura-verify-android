@@ -114,7 +114,7 @@ override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) 
 
 The SDK follows the activity's lifecycle, so the activity has to implement `LifecycleOwner` — every `ComponentActivity` already does. An activity that does not implement it is rejected with an `IllegalArgumentException`.
 
-That registry has to actually be driven, or the SDK never initializes and `login()` fails with an `IllegalStateException` saying so. [`PlainHostActivity`](example/src/main/java/eu/idura/verifyexample/PlainHostActivity.kt) in the example app shows how to manually implement `LifecycleOwner` and how to forward activity results.
+That registry has to actually be driven, or the SDK never initializes and `login()` fails with an `IllegalStateException` saying so. [`PlainHostActivity`](https://github.com/criipto/idura-verify-android/blob/master/example/src/main/java/eu/idura/verifyexample/PlainHostActivity.kt) in the example app shows how to manually implement `LifecycleOwner` and how to forward activity results.
 
 ### A word about redirect URLs
 
