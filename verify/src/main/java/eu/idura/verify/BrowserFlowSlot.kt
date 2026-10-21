@@ -41,14 +41,19 @@ internal class BrowserFlowSlot<T> {
     }
   }
 
+  // Both clear the slot themselves rather than leave it to the `finally` in [run]: that only runs
+  // once the continuation is dispatched, which on a non-immediate dispatcher is after whatever the
+  // caller does next — the host's `onResume`, for a result delivered through `onActivityResult`.
   fun resume(value: T): Boolean {
     val cont = continuation ?: return false
+    continuation = null
     cont.resume(value)
     return true
   }
 
   fun fail(ex: Throwable): Boolean {
     val cont = continuation ?: return false
+    continuation = null
     cont.resumeWithException(ex)
     return true
   }
