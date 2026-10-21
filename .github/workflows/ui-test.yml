@@ -50,7 +50,8 @@ jobs:
 
       # Once per host kind: MainActivity covers the ComponentActivity path, PlainHostActivity the
       # plain android.app.Activity one, where the SDK owns the activity result registry and the host
-      # forwards onActivityResult. Only the mock logins — every other case in these suites depends on
+      # forwards onActivityResult. The plain host's empty task affinity also has the Custom Tab
+      # callback arrive outside the host's task. Only the mock logins — every other case in these suites depends on
       # a third-party eID page and stays local, see CancellationTest.
       - name: Run mock login test on both tab types and both host kinds
         uses: reactivecircus/android-emulator-runner@v2

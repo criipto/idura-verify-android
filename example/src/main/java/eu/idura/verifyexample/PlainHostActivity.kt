@@ -34,6 +34,10 @@ private data class MockData(
  * - forward [onActivityResult] to [IduraVerify.handleActivityResult], since with no activity result
  *   registry to register against the SDK launches the browser through `startActivityForResult`.
  *
+ * Its manifest entry also clears its task affinity, as Flutter's app template does for the activity
+ * it hosts everything in. The browser and the MitID app hand the callback to the SDK in a new task,
+ * which then lands outside the host's task and has to find its way back to the login.
+ *
  * Deliberately not a launcher activity and not reachable from [MainActivity]: it exists for
  * `PlainHostLoginTest` to drive, and a second launcher activity would make `startApp` ambiguous for
  * the tests that drive the Compose UI. It lives in `main` rather than `androidTest` so that it ships
