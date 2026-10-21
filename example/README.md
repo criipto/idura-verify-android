@@ -24,7 +24,7 @@ The mock provider works out of the box, but other eID providers require you to r
 
 ## The plain-`Activity` host
 
-`MainActivity` is a `ComponentActivity`, which is what most apps have and what needs no extra work from you. `PlainHostActivity` is the same login on a plain `android.app.Activity`, where the host must drive its own `Lifecycle` and forward `onActivityResult` to the SDK. It is the smallest complete example of that path; see the SDK README section on hosts that are not a `ComponentActivity`.
+`MainActivity` is a `ComponentActivity`, which is what most apps have and what needs no extra work from you. `PlainHostActivity` is the same login on a plain `android.app.Activity`, where the host must drive its own `Lifecycle` and forward `onActivityResult` to the SDK. It is the smallest complete example of that path; see the SDK README section on hosts that are not a `ComponentActivity`. Like a Flutter app's activity, it has an empty `taskAffinity`, so the login callback arrives outside its task.
 
 It has no launcher icon and nothing in the app links to it: it exists for `PlainHostLoginTest` to drive, and a second launcher activity would make the other instrumented tests ambiguous about which host they started. So run it through that test:
 
