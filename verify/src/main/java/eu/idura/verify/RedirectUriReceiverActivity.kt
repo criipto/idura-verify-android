@@ -83,6 +83,7 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
     val record = BrowserFlowHostTask.current
     if (record == null) {
       Log.w(TAG, "Received a callback with no browser flow in flight")
+      recordCallbackWithNoFlow()
       return null
     }
     val hostTaskId = record.id
@@ -109,6 +110,25 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
       )
     }
     return hostTask
+  }
+
+  /**
+   * Most likely the MitID app returning to a process that died while the user was in it, which
+   * leaves no instance, and so no tracer, to report through. So a tracer of our own, for this one
+   * span. Like the SDK's dropped browser results, it is there to learn whether surviving process
+   * death is worth building. It takes nothing from the callback URI but its host, because the rest
+   * carries the authorization code.
+   */
+  private fun recordCallbackWithNoFlow() {
+    val tracing = Tracing(intent.data!!.host!!)
+    tracing
+      .getTracer(BuildConfig.LIBRARY_PACKAGE_NAME, BuildConfig.VERSION)
+      .spanBuilder("callback with no browser flow")
+      .setNoParent()
+      .setAttribute("receiver_task_id", taskId.toLong())
+      .startSpan()
+      .end()
+    tracing.close()
   }
 
   @Suppress("DEPRECATION")
