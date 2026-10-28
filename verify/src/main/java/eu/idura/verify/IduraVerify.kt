@@ -977,25 +977,35 @@ class IduraVerify private constructor(
       .spanBuilder("launch browser")
       .setAttribute("browser", browserDescription ?: "unknown")
       .withSpanContext(span)
-      .startAndRun {
-        browserFlowSlot.run {
-          if (tabType == TabType.AuthTab) {
-            // Open the Authorization URI in an Auth Tab if supported by chrome
-            val authTabIntent = AuthTabIntent.Builder().build()
+      .startAndRun { launchSpan ->
+        var hostTask: BrowserFlowHostTask? = null
+        try {
+          browserFlowSlot.run {
+            // For the redirect receiver, which needs it to return to the browser when it is started
+            // in a task of its own. In here rather than ahead of `run`, so a flow the slot turns
+            // away leaves the one in flight with its record.
+            hostTask = BrowserFlowHostTask.record(activity.taskId, launchSpan)
 
-            // Auth tab will use the default browser, but we force it to use chrome.
-            // In the future, other browser _could_ support the auth tab API (like they support custom tabs). But at the time of writing, only chrome supports it.
-            authTabIntent.intent.`package` = Browsers.Chrome.PACKAGE_NAME
-            authTabIntent.launch(
-              authTabIntentLauncher,
-              uri,
-              redirectUri.host!!,
-              redirectUri.path!!,
-            )
-          } else {
-            // Fall back to a Custom Tab.
-            customTabIntentLauncher.launch(Pair(request, uri))
+            if (tabType == TabType.AuthTab) {
+              // Open the Authorization URI in an Auth Tab if supported by chrome
+              val authTabIntent = AuthTabIntent.Builder().build()
+
+              // Auth tab will use the default browser, but we force it to use chrome.
+              // In the future, other browser _could_ support the auth tab API (like they support custom tabs). But at the time of writing, only chrome supports it.
+              authTabIntent.intent.`package` = Browsers.Chrome.PACKAGE_NAME
+              authTabIntent.launch(
+                authTabIntentLauncher,
+                uri,
+                redirectUri.host!!,
+                redirectUri.path!!,
+              )
+            } else {
+              // Fall back to a Custom Tab.
+              customTabIntentLauncher.launch(Pair(request, uri))
+            }
           }
+        } finally {
+          hostTask?.release()
         }
       }
 

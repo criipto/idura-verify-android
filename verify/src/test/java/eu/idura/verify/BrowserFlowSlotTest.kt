@@ -138,6 +138,31 @@ class BrowserFlowSlotTest {
       assertFalse(slot.isAwaiting)
     }
 
+  /**
+   * The host's `onResume` checks [BrowserFlowSlot.isAwaiting] right after `onActivityResult` has
+   * delivered the result, before the resumed flow has had a chance to run. It has to read the slot
+   * as empty by then.
+   */
+  @Test
+  fun `isAwaiting is false as soon as the result is handed over, before the flow runs`() =
+    runTest {
+      val slot = BrowserFlowSlot<String>()
+
+      val resumed = async { slot.run { } }
+      testScheduler.runCurrent()
+      slot.resume("ok")
+      assertFalse(slot.isAwaiting)
+      assertFalse(slot.resume("again"))
+      resumed.await()
+
+      val failed = async { runCatching { slot.run { } } }
+      testScheduler.runCurrent()
+      slot.fail(Exception("boom"))
+      assertFalse(slot.isAwaiting)
+      assertFalse(slot.fail(Exception("again")))
+      failed.await()
+    }
+
   @Test
   fun `resume is a no-op when no flow is in progress`() =
     runTest {
