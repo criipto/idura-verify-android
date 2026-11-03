@@ -316,6 +316,12 @@ class IduraVerify private constructor(
                 .createCustomTabsIntentBuilder(uri)
                 .setSendToExternalDefaultHandlerEnabled(true)
                 .build()
+            // The builder only names the browser while its Custom Tabs service is connected. Once the
+            // browser's process dies, an unpinned intent goes to the default browser, or to the
+            // system's chooser when there is none, whichever browser we selected.
+            authorizationService.browserDescriptor?.let {
+              customTabIntent.intent.setPackage(it.packageName)
+            }
 
             return when (request) {
               is AuthorizationRequest -> {
