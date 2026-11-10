@@ -66,6 +66,7 @@ internal class Tracing(
           .put("android.os.api_level", Build.VERSION.SDK_INT.toString())
           // Idura specific attributes
           .put("server.address", serverAddress)
+          .put("idura.sdk.name", "idura-verify-android")
           .put("idura.sdk.version", BuildConfig.VERSION)
           // Store a GUID, to help correlate session (such as SDK init, and logins) from the same device.
           // The session ID is intentionally not saved, so it is regenerated when the app restarts. See https://developer.android.com/identity/user-data-ids#instance-ids-guids
