@@ -1,12 +1,12 @@
 package eu.idura.verify
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.IntentCompat
 import net.openid.appauth.AuthorizationException
 
@@ -19,7 +19,7 @@ import net.openid.appauth.AuthorizationException
  * stack below the browser tab: it opens the tab when it first resumes, and decides when it resumes
  * again. With a callback URI the login completed, and without one the user closed the tab.
  */
-internal class CustomTabActivity : AppCompatActivity() {
+internal class CustomTabActivity : Activity() {
   private var tabStarted = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
