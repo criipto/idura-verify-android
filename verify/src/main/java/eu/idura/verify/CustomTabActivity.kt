@@ -1,6 +1,5 @@
 package eu.idura.verify
 
-import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -31,8 +30,6 @@ internal class CustomTabActivity : AppCompatActivity() {
   private var authorizationStarted = false
   private var authIntent: Intent? = null
   private var authRequest: AuthorizationManagementRequest? = null
-  private var completeIntent: PendingIntent? = null
-  private var cancelIntent: PendingIntent? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -72,15 +69,13 @@ internal class CustomTabActivity : AppCompatActivity() {
     outState.putParcelable(KEY_AUTH_INTENT, authIntent)
     outState.putString(KEY_AUTH_REQUEST, authRequest?.jsonSerializeString())
     outState.putString(KEY_AUTH_REQUEST_TYPE, authRequest?.let(::requestTypeFor))
-    outState.putParcelable(KEY_COMPLETE_INTENT, completeIntent)
-    outState.putParcelable(KEY_CANCEL_INTENT, cancelIntent)
   }
 
   private fun handleAuthorizationComplete() {
     val responseUri = intent.data!!
     val responseData = extractResponseData(responseUri)
     responseData.setData(responseUri)
-    sendResult(completeIntent, responseData, RESULT_OK)
+    setResult(RESULT_OK, responseData)
   }
 
   private fun handleAuthorizationCanceled() {
@@ -89,7 +84,7 @@ internal class CustomTabActivity : AppCompatActivity() {
       AuthorizationException
         .fromTemplate(AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW, null)
         .toIntent()
-    sendResult(cancelIntent, cancelData, RESULT_CANCELED)
+    setResult(RESULT_CANCELED, cancelData)
   }
 
   private fun handleBrowserNotFound() {
@@ -98,7 +93,7 @@ internal class CustomTabActivity : AppCompatActivity() {
       AuthorizationException
         .fromTemplate(AuthorizationException.GeneralErrors.PROGRAM_CANCELED_AUTH_FLOW, null)
         .toIntent()
-    sendResult(cancelIntent, cancelData, RESULT_CANCELED)
+    setResult(RESULT_CANCELED, cancelData)
   }
 
   private fun extractState(state: Bundle?) {
@@ -110,35 +105,15 @@ internal class CustomTabActivity : AppCompatActivity() {
 
     authIntent = BundleCompat.getParcelable(state, KEY_AUTH_INTENT, Intent::class.java)
     authorizationStarted = state.getBoolean(KEY_AUTHORIZATION_STARTED, false)
-    completeIntent =
-      BundleCompat.getParcelable(state, KEY_COMPLETE_INTENT, PendingIntent::class.java)
-    cancelIntent = BundleCompat.getParcelable(state, KEY_CANCEL_INTENT, PendingIntent::class.java)
     try {
       val authRequestJson = state.getString(KEY_AUTH_REQUEST, null)
       val authRequestType = state.getString(KEY_AUTH_REQUEST_TYPE, null)
       authRequest = authRequestJson?.let { requestFrom(it, authRequestType) }
     } catch (ex: JSONException) {
-      sendResult(
-        cancelIntent,
-        AuthorizationException.AuthorizationRequestErrors.INVALID_REQUEST.toIntent(),
+      setResult(
         RESULT_CANCELED,
+        AuthorizationException.AuthorizationRequestErrors.INVALID_REQUEST.toIntent(),
       )
-    }
-  }
-
-  private fun sendResult(
-    callback: PendingIntent?,
-    data: Intent,
-    resultCode: Int,
-  ) {
-    if (callback != null) {
-      try {
-        callback.send(this, 0, data)
-      } catch (e: PendingIntent.CanceledException) {
-        Log.e(TAG, "Failed to send cancel intent", e)
-      }
-    } else {
-      setResult(resultCode, data)
     }
   }
 
@@ -166,32 +141,20 @@ internal class CustomTabActivity : AppCompatActivity() {
     private const val KEY_AUTH_INTENT = "authIntent"
     private const val KEY_AUTH_REQUEST = "authRequest"
     private const val KEY_AUTH_REQUEST_TYPE = "authRequestType"
-    private const val KEY_COMPLETE_INTENT = "completeIntent"
-    private const val KEY_CANCEL_INTENT = "cancelIntent"
     private const val KEY_AUTHORIZATION_STARTED = "authStarted"
 
     private const val REQUEST_TYPE_AUTHORIZATION = "authorization"
     private const val REQUEST_TYPE_END_SESSION = "end_session"
 
-    fun createStartIntent(
+    fun createStartForResultIntent(
       context: Context,
       request: AuthorizationManagementRequest,
       authIntent: Intent,
-      completeIntent: PendingIntent?,
-      cancelIntent: PendingIntent?,
     ): Intent =
       createBaseIntent(context)
         .putExtra(KEY_AUTH_INTENT, authIntent)
         .putExtra(KEY_AUTH_REQUEST, request.jsonSerializeString())
         .putExtra(KEY_AUTH_REQUEST_TYPE, requestTypeFor(request))
-        .putExtra(KEY_COMPLETE_INTENT, completeIntent)
-        .putExtra(KEY_CANCEL_INTENT, cancelIntent)
-
-    fun createStartForResultIntent(
-      context: Context,
-      request: AuthorizationManagementRequest,
-      authIntent: Intent,
-    ): Intent = createStartIntent(context, request, authIntent, null, null)
 
     fun createResponseHandlingIntent(
       context: Context,
