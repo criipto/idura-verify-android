@@ -68,7 +68,6 @@ internal const val TAG = "IduraVerify"
 internal const val APPSWITCH_QUERY_PARAM = "idura_android_sdk_appswitch"
 
 private const val BRAVE = "com.brave.browser"
-private const val EDGE = "com.microsoft.emmx"
 
 private enum class TabType {
   CustomTab(),
@@ -441,7 +440,6 @@ class IduraVerify private constructor(
             Pair(Browsers.Chrome.PACKAGE_NAME, VersionedBrowserMatcher.CHROME_CUSTOM_TAB),
             Pair(Browsers.SBrowser.PACKAGE_NAME, VersionedBrowserMatcher.SAMSUNG_CUSTOM_TAB),
             Pair(BRAVE, BrowserMatcher { it.packageName == BRAVE }),
-            Pair(EDGE, BrowserMatcher { it.packageName == EDGE }),
           ).find {
             // Find the first of our preferred browsers, which is able to open a custom tab.
             CustomTabsClient.getPackageName(
