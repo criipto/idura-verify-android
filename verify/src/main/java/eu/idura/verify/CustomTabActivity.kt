@@ -15,9 +15,15 @@ import net.openid.appauth.AuthorizationException
  * the result's data. Without a URI it returns `RESULT_CANCELED`, with an [AuthorizationException]
  * in the intent when there was no browser to open the tab in.
  *
- * Like AppAuth's `AuthorizationManagementActivity`, which it was ported from, it keeps the back
- * stack below the browser tab: it opens the tab when it first resumes, and decides when it resumes
- * again. With a callback URI the login completed, and without one the user closed the tab.
+ * It was ported from AppAuth's `AuthorizationManagementActivity`, which is `singleTask`. The system
+ * finds a singleTask instance by affinity only, so for a host whose task affinity differs from the
+ * package name (Flutter's template sets an empty one) the instance opened in a task of its own,
+ * away from the host waiting for its result. This one has the standard launch mode, so it opens in
+ * the host's task. The receiver's restart reaches it there when the receiver is in that task too.
+ *
+ * Like `AuthorizationManagementActivity`, it keeps the back stack below the browser tab: it opens
+ * the tab when it first resumes, and decides when it resumes again. With a callback URI the login
+ * completed, and without one the user closed the tab.
  */
 internal class CustomTabActivity : Activity() {
   private var tabStarted = false
