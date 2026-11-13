@@ -16,15 +16,36 @@ import java.lang.ref.WeakReference
  * the result's data. Without a URI it returns `RESULT_CANCELED`, with an [AuthorizationException]
  * in the intent when there was no browser to open the tab in.
  *
- * It was ported from AppAuth's `AuthorizationManagementActivity`, which is `singleTask`. The system
+ * It stands in for AppAuth's `AuthorizationManagementActivity`, which is `singleTask`. The system
  * finds a singleTask instance by affinity only, so for a host whose task affinity differs from the
- * package name (Flutter's template sets an empty one) the instance opened in a task of its own,
- * away from the host waiting for its result. This one has the standard launch mode, so it opens in
- * the host's task, and [deliver] restarts it from within that task, whatever the affinities.
+ * package name (Flutter's template sets an empty one) the receiver's response started a second
+ * instance, and the waiting one reported a cancel. This one has the standard launch mode, and gets
+ * the URI in process instead: [deliver] leaves it on the flow's [BrowserFlowHostTask], where the
+ * instance looks when it resumes, and restarts the instance from within its own task, whatever the
+ * affinities.
  *
- * Like `AuthorizationManagementActivity`, it keeps the back stack below the browser tab: it opens
- * the tab when it first resumes, and decides when it resumes again. With a callback URI the login
- * completed, and without one the user closed the tab.
+ * The callback is an app link, so the browser could load it. We ask it to hand redirects to their
+ * default handler, which is our receiver, instead (by calling
+ * setSendToExternalDefaultHandlerEnabled(true)). Whether the browser closes its tab after handing one
+ * off is up to the browser: Chrome and Samsung Internet close theirs, while Edge and Firefox leave
+ * theirs open. Like AppAuth's response handling, the restart clears the top, and with it any tab
+ * still open, so the host isn't left stuck behind it.
+ *
+ * Like `AuthorizationManagementActivity`, it decides when it resumes after opening the tab: with a
+ * callback URI the login completed, and without one the user closed the tab. The tab has to be gone
+ * for us to resume, and in every redirect we observed the browser started our receiver before it
+ * closed its tab, if it closed it at all.
+ *
+ * The system can destroy the instance while the tab is open, and recreates it from its back-stack
+ * record once it is on top again. The URI waits for it on the record, which lasts as long as the
+ * login waiting for the result. Without a live instance to restart from, the receiver restarts it
+ * when it is in the host's task itself. When it is not, nothing can: `AppTask.startActivity` starts a
+ * new instance rather than reaching the record. Moving the host's task to the front then recreates
+ * the instance, unless a browser left its tab open, which the user has to close first. The receiver
+ * records that on the flow's span.
+ *
+ * A restart that finds no instance to reach creates a new one, without a tab to open. That one
+ * decides straight away, and its result goes nowhere, since nothing started it for one.
  */
 internal class CustomTabActivity : Activity() {
   private var tabStarted = false
@@ -57,18 +78,13 @@ internal class CustomTabActivity : Activity() {
       return
     }
 
-    val uri = intent.data
+    val uri = BrowserFlowHostTask.current?.callbackUri
     if (uri != null) {
       setResult(RESULT_OK, Intent().setData(uri))
     } else {
       setResult(RESULT_CANCELED)
     }
     finish()
-  }
-
-  override fun onNewIntent(intent: Intent) {
-    super.onNewIntent(intent)
-    setIntent(intent)
   }
 
   override fun onSaveInstanceState(outState: Bundle) {
@@ -94,21 +110,25 @@ internal class CustomTabActivity : Activity() {
     ): Intent = Intent(context, CustomTabActivity::class.java).putExtra(EXTRA_TAB_INTENT, tabIntent)
 
     /**
-     * Restarts the waiting instance with [uri], from the instance itself, so in its own task. The
-     * receiver may be in another task, where a restart of its own would start a second instance.
-     * When the system destroyed the instance, [caller] restarts it instead, like AppAuth's receiver.
+     * Leaves [uri] on [record] for the waiting instance, and restarts that instance in its own task:
+     * from the instance when it is alive, and from [caller] when the system destroyed it and
+     * [caller] is in the host's task. Returns false when neither can, leaving the instance to take
+     * the URI once it is on top again.
      */
     fun deliver(
       caller: Activity,
+      record: BrowserFlowHostTask,
       uri: Uri,
-    ) {
+    ): Boolean {
+      record.callbackUri = uri
       // Started without FLAG_ACTIVITY_NEW_TASK, so it lands in the starting activity's task.
-      val starter = waiting?.get() ?: caller
+      val starter =
+        waiting?.get() ?: caller.takeIf { it.taskId == record.id } ?: return false
       starter.startActivity(
         Intent(starter, CustomTabActivity::class.java)
-          .setData(uri)
           .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
       )
+      return true
     }
   }
 }
