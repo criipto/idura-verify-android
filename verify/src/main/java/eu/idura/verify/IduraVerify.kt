@@ -37,7 +37,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 import net.openid.appauth.AppAuthConfiguration
 import net.openid.appauth.AuthorizationException
-import net.openid.appauth.AuthorizationManagementActivity
 import net.openid.appauth.AuthorizationManagementRequest
 import net.openid.appauth.AuthorizationManagementResponse
 import net.openid.appauth.AuthorizationRequest
@@ -227,8 +226,7 @@ class IduraVerify private constructor(
    * An activity result launcher, used to a launch a custom tab intent and listen for the result.
    * See https://developer.android.com/training/basics/intents/result
    */
-  private lateinit var customTabIntentLauncher:
-    ActivityResultLauncher<Pair<AuthorizationManagementRequest, Uri>>
+  private lateinit var customTabIntentLauncher: ActivityResultLauncher<Uri>
 
   /**
    * The keys the activity result registry files our launchers under. They have to be stable across
@@ -301,45 +299,26 @@ class IduraVerify private constructor(
     customTabIntentLauncher =
       activityResultRegistry.register(
         customTabLauncherKey,
-        object :
-          ActivityResultContract<Pair<AuthorizationManagementRequest, Uri>, CustomTabResult>() {
+        object : ActivityResultContract<Uri, CustomTabResult>() {
           override fun createIntent(
             context: AndroidContext,
-            input: Pair<AuthorizationManagementRequest, Uri>,
+            input: Uri,
           ): Intent {
             Log.d(TAG, "Creating custom tab intent")
 
-            var (request, uri) = input
-
             val customTabIntent =
               authorizationService
-                .createCustomTabsIntentBuilder(uri)
+                .createCustomTabsIntentBuilder(input)
                 .setSendToExternalDefaultHandlerEnabled(true)
                 .build()
-
-            return when (request) {
-              is AuthorizationRequest -> {
-                AuthorizationManagementActivity.createStartForResultIntent(
-                  activity,
-                  request,
-                  customTabIntent.intent
-                    .setData(uri),
-                )
-              }
-
-              is EndSessionRequest -> {
-                authorizationService.getEndSessionRequestIntent(
-                  request,
-                  customTabIntent,
-                )
-              }
-
-              else -> {
-                throw IduraVerifyInternalException(
-                  "Unsupported request type: ${request::class.simpleName}",
-                )
-              }
+            // The builder only names the browser while its Custom Tabs service is connected. Once the
+            // browser's process dies, an unpinned intent goes to the default browser, or to the
+            // system's chooser when there is none, whichever browser we selected.
+            authorizationService.browserDescriptor?.let {
+              customTabIntent.intent.setPackage(it.packageName)
             }
+
+            return CustomTabActivity.createIntent(activity, customTabIntent.intent.setData(input))
           }
 
           override fun parseResult(
@@ -717,7 +696,7 @@ class IduraVerify private constructor(
 
           val parRequestUri = pushAuthorizationRequest(authorizationRequest, span)
 
-          val callbackUri = launchBrowser(authorizationRequest, parRequestUri, span)
+          val callbackUri = launchBrowser(parRequestUri, span)
 
           val jwt =
             if (callbackUri.getQueryParameter("code") != null) {
@@ -840,7 +819,7 @@ class IduraVerify private constructor(
               .setPostLogoutRedirectUri(redirectUri)
               .build()
 
-          val callbackUri = launchBrowser(endSessionRequest, endSessionRequest.toUri(), span)
+          val callbackUri = launchBrowser(endSessionRequest.toUri(), span)
 
           val response =
             EndSessionResponse
@@ -969,8 +948,7 @@ class IduraVerify private constructor(
       }
 
   private suspend fun launchBrowser(
-    request: AuthorizationManagementRequest,
-    uri: Uri = request.toUri(),
+    uri: Uri,
     span: Span,
   ): Uri =
     tracer
@@ -1001,7 +979,7 @@ class IduraVerify private constructor(
               )
             } else {
               // Fall back to a Custom Tab.
-              customTabIntentLauncher.launch(Pair(request, uri))
+              customTabIntentLauncher.launch(uri)
             }
           }
         } finally {
