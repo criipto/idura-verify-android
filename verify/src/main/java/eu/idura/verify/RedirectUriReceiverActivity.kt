@@ -1,6 +1,7 @@
 package eu.idura.verify
 
 import android.app.ActivityManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -14,7 +15,8 @@ import java.util.concurrent.atomic.AtomicReference
  * The task of the activity whose browser flow is in flight, recorded when the browser is launched,
  * along with the span of that launch for the receiver to report on. Process-wide, because that is
  * all the receiver below can reach: it is started by the system, not by the instance that launched
- * the browser.
+ * the browser. For a Custom Tab it also carries the callback URI from the receiver to the
+ * [CustomTabActivity], so the URI lives exactly as long as the flow.
  *
  * Only the latest flow is kept. Flows on two instances at once — on two activities, since one
  * activity hosts one task — would see the earlier one sent to the later one's task.
@@ -23,6 +25,9 @@ internal class BrowserFlowHostTask private constructor(
   val id: Int,
   val span: Span,
 ) {
+  /** Set by the receiver, read by the trampoline. Main thread only. */
+  var callbackUri: Uri? = null
+
   /** Forget this record, unless a later flow has replaced it already. */
   fun release() {
     currentRecord.compareAndSet(this, null)
@@ -68,7 +73,20 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
       recordCallbackWithNoFlow()
     } else {
       if (!isAppswitch) {
-        CustomTabActivity.deliver(this, intent.data!!)
+        // Before the host's task moves, so a trampoline the move brings back finds the URI.
+        val restarted = CustomTabActivity.deliver(this, record, intent.data!!)
+        if (!restarted) {
+          Log.w(TAG, "Could not restart the CustomTabActivity; it takes the callback once on top")
+          record.span.addEvent(
+            "trampoline not restarted",
+            Attributes.of(
+              AttributeKey.longKey("host_task_id"),
+              record.id.toLong(),
+              AttributeKey.longKey("receiver_task_id"),
+              taskId.toLong(),
+            ),
+          )
+        }
       }
       findHostTask(record)?.moveToFront()
     }
