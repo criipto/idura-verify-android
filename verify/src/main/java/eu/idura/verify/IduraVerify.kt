@@ -249,6 +249,7 @@ class IduraVerify private constructor(
     cacheResult(lifecycleOwner.lifecycleScope, this::loadIduraOIDCConfiguration)
 
   private var foundASuitableBrowser = false
+  private var browserNeedsContinueButton = false
 
   // Must be initialized before the init block: register() below replays a result queued while the
   // process was dead synchronously, and the result handlers resume this slot. With no login in
@@ -416,13 +417,12 @@ class IduraVerify private constructor(
     if (browserName != null) {
       foundASuitableBrowser = true
 
-      browserDescription =
-        "$browserName ${
-          activity.packageManager.getPackageInfo(
-            browserName,
-            0,
-          ).versionName
-        }, $tabType"
+      val versionName = activity.packageManager.getPackageInfo(browserName, 0).versionName
+      browserDescription = "$browserName $versionName, $tabType"
+      browserNeedsContinueButton =
+        tabType == TabType.CustomTab &&
+        browserName == Browsers.Chrome.PACKAGE_NAME &&
+        (versionName?.substringBefore('.')?.toIntOrNull() ?: Int.MAX_VALUE) < 117
       Log.i(TAG, "Using $browserDescription")
     }
   }
@@ -681,7 +681,10 @@ class IduraVerify private constructor(
           }
 
           val loginHints =
-            mutableSetOf("mobile:continue_button:never").apply { addAll(eid.loginHints) }
+            mutableSetOf<String>().apply {
+              if (!browserNeedsContinueButton) add("mobile:continue_button:never")
+              addAll(eid.loginHints)
+            }
 
           if (eid.supportsAppSwitch) {
             loginHints.add("appswitch:android")
@@ -974,6 +977,7 @@ class IduraVerify private constructor(
     tracer
       .spanBuilder("launch browser")
       .setAttribute("browser", browserDescription ?: "unknown")
+      .setAttribute("browser.needs_continue_button", browserNeedsContinueButton)
       .withSpanContext(span)
       .startAndRun { launchSpan ->
         var hostTask: BrowserFlowHostTask? = null
