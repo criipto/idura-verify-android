@@ -11,28 +11,31 @@ import androidx.core.content.IntentCompat
 import net.openid.appauth.AuthorizationException
 
 /**
- * A Kotlin port of AppAuth's `AuthorizationManagementActivity` (0.11.1), so that the commits after
- * it can change it in steps. It keeps the back stack below the browser tab: it opens the tab when
- * it first resumes, and on its next resume returns the response URI the receiver handed it as the
- * result's data, or a cancel when there is none.
+ * Opens a Custom Tab and returns the callback URI that [RedirectUriReceiverActivity] hands it, as
+ * the result's data. Without a URI it returns `RESULT_CANCELED`, with an [AuthorizationException]
+ * in the intent when there was no browser to open the tab in.
+ *
+ * Like AppAuth's `AuthorizationManagementActivity`, which it was ported from, it keeps the back
+ * stack below the browser tab: it opens the tab when it first resumes, and decides when it resumes
+ * again. With a callback URI the login completed, and without one the user closed the tab.
  */
 internal class CustomTabActivity : AppCompatActivity() {
-  private var authorizationStarted = false
+  private var tabStarted = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    authorizationStarted = savedInstanceState?.getBoolean(KEY_AUTHORIZATION_STARTED) ?: false
+    tabStarted = savedInstanceState?.getBoolean(KEY_TAB_STARTED) ?: false
   }
 
   override fun onResume() {
     super.onResume()
 
-    val authIntent =
-      IntentCompat.getParcelableExtra(intent, KEY_AUTH_INTENT, Intent::class.java)
-    if (!authorizationStarted && authIntent != null) {
+    val tabIntent =
+      IntentCompat.getParcelableExtra(intent, EXTRA_TAB_INTENT, Intent::class.java)
+    if (!tabStarted && tabIntent != null) {
       try {
-        startActivity(authIntent)
-        authorizationStarted = true
+        startActivity(tabIntent)
+        tabStarted = true
       } catch (ex: ActivityNotFoundException) {
         Log.w(TAG, "No browser to open the Custom Tab in", ex)
         setResult(
@@ -62,17 +65,17 @@ internal class CustomTabActivity : AppCompatActivity() {
 
   override fun onSaveInstanceState(outState: Bundle) {
     super.onSaveInstanceState(outState)
-    outState.putBoolean(KEY_AUTHORIZATION_STARTED, authorizationStarted)
+    outState.putBoolean(KEY_TAB_STARTED, tabStarted)
   }
 
   companion object {
-    private const val KEY_AUTH_INTENT = "authIntent"
-    private const val KEY_AUTHORIZATION_STARTED = "authStarted"
+    private const val EXTRA_TAB_INTENT = "eu.idura.verify.TAB_INTENT"
+    private const val KEY_TAB_STARTED = "eu.idura.verify.TAB_STARTED"
 
     fun createIntent(
       context: Context,
-      authIntent: Intent,
-    ): Intent = Intent(context, CustomTabActivity::class.java).putExtra(KEY_AUTH_INTENT, authIntent)
+      tabIntent: Intent,
+    ): Intent = Intent(context, CustomTabActivity::class.java).putExtra(EXTRA_TAB_INTENT, tabIntent)
 
     fun createResponseHandlingIntent(
       context: Context,
