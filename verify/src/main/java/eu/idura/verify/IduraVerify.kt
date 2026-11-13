@@ -226,8 +226,7 @@ class IduraVerify private constructor(
    * An activity result launcher, used to a launch a custom tab intent and listen for the result.
    * See https://developer.android.com/training/basics/intents/result
    */
-  private lateinit var customTabIntentLauncher:
-    ActivityResultLauncher<Pair<AuthorizationManagementRequest, Uri>>
+  private lateinit var customTabIntentLauncher: ActivityResultLauncher<Uri>
 
   /**
    * The keys the activity result registry files our launchers under. They have to be stable across
@@ -300,19 +299,16 @@ class IduraVerify private constructor(
     customTabIntentLauncher =
       activityResultRegistry.register(
         customTabLauncherKey,
-        object :
-          ActivityResultContract<Pair<AuthorizationManagementRequest, Uri>, CustomTabResult>() {
+        object : ActivityResultContract<Uri, CustomTabResult>() {
           override fun createIntent(
             context: AndroidContext,
-            input: Pair<AuthorizationManagementRequest, Uri>,
+            input: Uri,
           ): Intent {
             Log.d(TAG, "Creating custom tab intent")
 
-            val (request, uri) = input
-
             val customTabIntent =
               authorizationService
-                .createCustomTabsIntentBuilder(uri)
+                .createCustomTabsIntentBuilder(input)
                 .setSendToExternalDefaultHandlerEnabled(true)
                 .build()
             // The builder only names the browser while its Custom Tabs service is connected. Once the
@@ -322,11 +318,7 @@ class IduraVerify private constructor(
               customTabIntent.intent.setPackage(it.packageName)
             }
 
-            return CustomTabActivity.createStartForResultIntent(
-              activity,
-              request,
-              customTabIntent.intent.setData(uri),
-            )
+            return CustomTabActivity.createIntent(activity, customTabIntent.intent.setData(input))
           }
 
           override fun parseResult(
@@ -704,7 +696,7 @@ class IduraVerify private constructor(
 
           val parRequestUri = pushAuthorizationRequest(authorizationRequest, span)
 
-          val callbackUri = launchBrowser(authorizationRequest, parRequestUri, span)
+          val callbackUri = launchBrowser(parRequestUri, span)
 
           val jwt =
             if (callbackUri.getQueryParameter("code") != null) {
@@ -827,7 +819,7 @@ class IduraVerify private constructor(
               .setPostLogoutRedirectUri(redirectUri)
               .build()
 
-          val callbackUri = launchBrowser(endSessionRequest, endSessionRequest.toUri(), span)
+          val callbackUri = launchBrowser(endSessionRequest.toUri(), span)
 
           val response =
             EndSessionResponse
@@ -956,8 +948,7 @@ class IduraVerify private constructor(
       }
 
   private suspend fun launchBrowser(
-    request: AuthorizationManagementRequest,
-    uri: Uri = request.toUri(),
+    uri: Uri,
     span: Span,
   ): Uri =
     tracer
@@ -988,7 +979,7 @@ class IduraVerify private constructor(
               )
             } else {
               // Fall back to a Custom Tab.
-              customTabIntentLauncher.launch(Pair(request, uri))
+              customTabIntentLauncher.launch(uri)
             }
           }
         } finally {
