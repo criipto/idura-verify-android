@@ -41,8 +41,9 @@ internal class BrowserFlowHostTask private constructor(
   }
 }
 
-// This is heavily inspired by the `net.openid.appauth.RedirectUriReceiverActivity` class, but only starts the
-// `CustomTabActivity` if this is _not_ a DK MitID app switch.
+// Takes the callback URI from the browser, or from the MitID app on an app switch. The browser's is
+// handed to the waiting CustomTabActivity, unless the Auth Tab took the callback itself. An app
+// switch only needs the browser brought back, which carries on with the login.
 class RedirectUriReceiverActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceBundle: Bundle?) {
     super.onCreate(savedInstanceBundle)
@@ -52,37 +53,32 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
         .queryParameterNames
         .contains(APPSWITCH_QUERY_PARAM)
 
-    if (!isAppswitch) {
-      // this is taken from net.openid.appauth.AuthorizationManagementActivity.RedirectUriReceiverActivity
-      startActivity(
-        CustomTabActivity.createResponseHandlingIntent(
-          this,
-          intent.data,
-        ),
-      )
+    // The browser and the MitID app open the callback URI with FLAG_ACTIVITY_NEW_TASK, which places
+    // us in the task matching our affinity — the package name by default. A host whose task has a
+    // different one (Flutter's template sets an empty `taskAffinity`, for one) does not match, so we
+    // get a task of our own, and finishing would leave the host behind in the background. So we
+    // bring the host's task forward whenever we did not land in it.
+    //
+    // On an app switch the browser is still on top of the host, carrying on with the login, so that
+    // is all there is to do. Otherwise the URI goes to the trampoline, which is restarted in the
+    // host's task, clearing the tab off the top of it.
+    val record = BrowserFlowHostTask.current
+    if (record == null) {
+      Log.w(TAG, "Received a callback with no browser flow in flight")
+      recordCallbackWithNoFlow()
     } else {
-      // The MitID app opens the callback URI with FLAG_ACTIVITY_NEW_TASK, which places us in the task
-      // matching our affinity — the package name by default. A host whose task has a different one
-      // (Flutter's template sets an empty `taskAffinity`, for one) does not match, so we get a task
-      // of our own, and finishing would leave the host behind in the background, with the browser
-      // still on top of it carrying on with the login. So we bring the host's task forward whenever
-      // we did not land in it. The browser's own callback above has the same problem, which this
-      // does not address.
-      val record = BrowserFlowHostTask.current
-      if (record == null) {
-        Log.w(TAG, "Received a callback with no browser flow in flight")
-        recordCallbackWithNoFlow()
-      } else {
-        findHostTask(record)?.moveToFront()
+      if (!isAppswitch) {
+        CustomTabActivity.deliver(this, intent.data!!)
       }
+      findHostTask(record)?.moveToFront()
     }
     finish()
   }
 
   /**
    * The host's task, if it is not the one we were placed in. `null` when we are already in it, which
-   * is the common case, and also when it cannot be found — then all we can do is carry on as if we
-   * were, and log why the login may not come back.
+   * is the common case, and also when it cannot be found — then all we can do is log why the login
+   * may not come back.
    */
   private fun findHostTask(record: BrowserFlowHostTask): ActivityManager.AppTask? {
     val hostTaskId = record.id
