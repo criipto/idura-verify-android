@@ -309,7 +309,7 @@ class IduraVerify private constructor(
           ): Intent {
             Log.d(TAG, "Creating custom tab intent")
 
-            var (request, uri) = input
+            val (request, uri) = input
 
             val customTabIntent =
               authorizationService
@@ -323,29 +323,11 @@ class IduraVerify private constructor(
               customTabIntent.intent.setPackage(it.packageName)
             }
 
-            return when (request) {
-              is AuthorizationRequest -> {
-                AuthorizationManagementActivity.createStartForResultIntent(
-                  activity,
-                  request,
-                  customTabIntent.intent
-                    .setData(uri),
-                )
-              }
-
-              is EndSessionRequest -> {
-                authorizationService.getEndSessionRequestIntent(
-                  request,
-                  customTabIntent,
-                )
-              }
-
-              else -> {
-                throw IduraVerifyInternalException(
-                  "Unsupported request type: ${request::class.simpleName}",
-                )
-              }
-            }
+            return AuthorizationManagementActivity.createStartForResultIntent(
+              activity,
+              request,
+              customTabIntent.intent.setData(uri),
+            )
           }
 
           override fun parseResult(
