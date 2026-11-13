@@ -69,7 +69,13 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
       // still on top of it carrying on with the login. So we bring the host's task forward whenever
       // we did not land in it. The browser's own callback above has the same problem, which this
       // does not address.
-      findHostTask()?.moveToFront()
+      val record = BrowserFlowHostTask.current
+      if (record == null) {
+        Log.w(TAG, "Received a callback with no browser flow in flight")
+        recordCallbackWithNoFlow()
+      } else {
+        findHostTask(record)?.moveToFront()
+      }
     }
     finish()
   }
@@ -79,13 +85,7 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
    * is the common case, and also when it cannot be found — then all we can do is carry on as if we
    * were, and log why the login may not come back.
    */
-  private fun findHostTask(): ActivityManager.AppTask? {
-    val record = BrowserFlowHostTask.current
-    if (record == null) {
-      Log.w(TAG, "Received a callback with no browser flow in flight")
-      recordCallbackWithNoFlow()
-      return null
-    }
+  private fun findHostTask(record: BrowserFlowHostTask): ActivityManager.AppTask? {
     val hostTaskId = record.id
     if (hostTaskId == taskId) return null
 
