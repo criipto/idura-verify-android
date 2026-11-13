@@ -7,7 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.os.BundleCompat
+import androidx.core.content.IntentCompat
 import net.openid.appauth.AuthorizationException
 
 /**
@@ -18,22 +18,29 @@ import net.openid.appauth.AuthorizationException
  */
 internal class CustomTabActivity : AppCompatActivity() {
   private var authorizationStarted = false
-  private var authIntent: Intent? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    extractState(savedInstanceState ?: intent.extras)
+    authorizationStarted = savedInstanceState?.getBoolean(KEY_AUTHORIZATION_STARTED) ?: false
   }
 
   override fun onResume() {
     super.onResume()
 
-    if (!authorizationStarted) {
+    val authIntent =
+      IntentCompat.getParcelableExtra(intent, KEY_AUTH_INTENT, Intent::class.java)
+    if (!authorizationStarted && authIntent != null) {
       try {
         startActivity(authIntent)
         authorizationStarted = true
-      } catch (e: ActivityNotFoundException) {
-        handleBrowserNotFound()
+      } catch (ex: ActivityNotFoundException) {
+        Log.w(TAG, "No browser to open the Custom Tab in", ex)
+        setResult(
+          RESULT_CANCELED,
+          AuthorizationException
+            .fromTemplate(AuthorizationException.GeneralErrors.PROGRAM_CANCELED_AUTH_FLOW, ex)
+            .toIntent(),
+        )
         finish()
       }
       return
@@ -56,27 +63,6 @@ internal class CustomTabActivity : AppCompatActivity() {
   override fun onSaveInstanceState(outState: Bundle) {
     super.onSaveInstanceState(outState)
     outState.putBoolean(KEY_AUTHORIZATION_STARTED, authorizationStarted)
-    outState.putParcelable(KEY_AUTH_INTENT, authIntent)
-  }
-
-  private fun handleBrowserNotFound() {
-    Log.d(TAG, "Authorization flow canceled due to missing browser")
-    val cancelData =
-      AuthorizationException
-        .fromTemplate(AuthorizationException.GeneralErrors.PROGRAM_CANCELED_AUTH_FLOW, null)
-        .toIntent()
-    setResult(RESULT_CANCELED, cancelData)
-  }
-
-  private fun extractState(state: Bundle?) {
-    if (state == null) {
-      Log.w(TAG, "No stored state - unable to handle response")
-      finish()
-      return
-    }
-
-    authIntent = BundleCompat.getParcelable(state, KEY_AUTH_INTENT, Intent::class.java)
-    authorizationStarted = state.getBoolean(KEY_AUTHORIZATION_STARTED, false)
   }
 
   companion object {
@@ -86,16 +72,14 @@ internal class CustomTabActivity : AppCompatActivity() {
     fun createIntent(
       context: Context,
       authIntent: Intent,
-    ): Intent = createBaseIntent(context).putExtra(KEY_AUTH_INTENT, authIntent)
+    ): Intent = Intent(context, CustomTabActivity::class.java).putExtra(KEY_AUTH_INTENT, authIntent)
 
     fun createResponseHandlingIntent(
       context: Context,
       responseUri: Uri?,
     ): Intent =
-      createBaseIntent(context)
+      Intent(context, CustomTabActivity::class.java)
         .setData(responseUri)
         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-
-    private fun createBaseIntent(context: Context) = Intent(context, CustomTabActivity::class.java)
   }
 }
