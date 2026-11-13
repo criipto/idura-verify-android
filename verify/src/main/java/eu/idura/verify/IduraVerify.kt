@@ -37,7 +37,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 import net.openid.appauth.AppAuthConfiguration
 import net.openid.appauth.AuthorizationException
-import net.openid.appauth.AuthorizationManagementActivity
 import net.openid.appauth.AuthorizationManagementRequest
 import net.openid.appauth.AuthorizationManagementResponse
 import net.openid.appauth.AuthorizationRequest
@@ -323,7 +322,7 @@ class IduraVerify private constructor(
               customTabIntent.intent.setPackage(it.packageName)
             }
 
-            return AuthorizationManagementActivity.createStartForResultIntent(
+            return CustomTabActivity.createStartForResultIntent(
               activity,
               request,
               customTabIntent.intent.setData(uri),

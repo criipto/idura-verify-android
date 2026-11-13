@@ -8,7 +8,6 @@ import androidx.appcompat.app.AppCompatActivity
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
-import net.openid.appauth.AuthorizationManagementActivity
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -43,7 +42,7 @@ internal class BrowserFlowHostTask private constructor(
 }
 
 // This is heavily inspired by the `net.openid.appauth.RedirectUriReceiverActivity` class, but only starts the
-// `AuthorizationManagementActivity` if this is _not_ a DK MitID app switch.
+// `CustomTabActivity` if this is _not_ a DK MitID app switch.
 class RedirectUriReceiverActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceBundle: Bundle?) {
     super.onCreate(savedInstanceBundle)
@@ -56,7 +55,7 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
     if (!isAppswitch) {
       // this is taken from net.openid.appauth.AuthorizationManagementActivity.RedirectUriReceiverActivity
       startActivity(
-        AuthorizationManagementActivity.createResponseHandlingIntent(
+        CustomTabActivity.createResponseHandlingIntent(
           this,
           intent.data,
         ),

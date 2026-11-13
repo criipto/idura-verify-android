@@ -27,5 +27,11 @@
                 <data android:path="/android/callback" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="eu.idura.verify.CustomTabActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.AppCompat.Translucent.NoTitleBar" />
     </application>
 </manifest>
