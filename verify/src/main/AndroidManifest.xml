@@ -31,7 +31,6 @@
             android:name="eu.idura.verify.CustomTabActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden"
             android:exported="false"
-            android:launchMode="singleTask"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

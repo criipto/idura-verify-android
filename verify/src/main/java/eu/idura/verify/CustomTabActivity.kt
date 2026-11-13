@@ -15,9 +15,23 @@ import net.openid.appauth.AuthorizationException
  * the result's data. Without a URI it returns `RESULT_CANCELED`, with an [AuthorizationException]
  * in the intent when there was no browser to open the tab in.
  *
- * Like AppAuth's `AuthorizationManagementActivity`, which it was ported from, it keeps the back
- * stack below the browser tab: it opens the tab when it first resumes, and decides when it resumes
- * again. With a callback URI the login completed, and without one the user closed the tab.
+ * It was ported from AppAuth's `AuthorizationManagementActivity`, which is `singleTask`. The system
+ * finds a singleTask instance by affinity only, so for a host whose task affinity differs from the
+ * package name (Flutter's template sets an empty one) the instance opened in a task of its own,
+ * away from the host waiting for its result. This one has the standard launch mode, so it opens in
+ * the host's task. The receiver's restart reaches it there when the receiver is in that task too.
+ *
+ * The callback is an app link, so the browser could load it. We ask it to hand redirects to their
+ * default handler, which is our receiver, instead (by calling
+ * setSendToExternalDefaultHandlerEnabled(true)). Whether the browser closes its tab after handing one
+ * off is up to the browser: Chrome and Samsung Internet close theirs, while Edge and Firefox leave
+ * theirs open. Like AppAuth's response handling, the restart clears the top, and with it any tab
+ * still open, so the host isn't left stuck behind it.
+ *
+ * Like `AuthorizationManagementActivity`, it decides when it resumes after opening the tab: with a
+ * callback URI the login completed, and without one the user closed the tab. The tab has to be gone
+ * for us to resume, and in every redirect we observed the browser started our receiver before it
+ * closed its tab, if it closed it at all.
  */
 internal class CustomTabActivity : Activity() {
   private var tabStarted = false
