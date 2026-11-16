@@ -13,6 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.regex.Pattern
 
 @RunWith(AndroidJUnit4::class)
 class LoginTest {
@@ -77,6 +78,14 @@ class LoginTest {
         )
 
       button.swipe(Direction.RIGHT, 1.0f)
+
+      val continueButton = By.text(Pattern.compile("(?i)continue to.*"))
+      device.wait(
+        Until.hasObject(By.text(Pattern.compile("(?i)continue to.*|Logged in!"))),
+        30_000,
+      )
+      device.findObject(continueButton)?.click()
+
       waitForAppToBeVisible("eu.idura.verifyexample", 30_000)
 
       onElement { textAsString() == "Logged in!" }.click()
