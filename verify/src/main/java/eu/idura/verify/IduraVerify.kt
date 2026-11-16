@@ -838,7 +838,10 @@ class IduraVerify private constructor(
                 ),
               ).build()
 
-          validateState(endSessionRequest, response)
+          if (!validateState(endSessionRequest, response)) {
+            throw IduraVerifyInternalException("State mismatch in OIDC response")
+          }
+          true
         } catch (ex: IduraVerifyException) {
           ex.traceId = span.spanContext.traceId
           throw ex
