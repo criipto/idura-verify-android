@@ -102,16 +102,8 @@ class DuplicateInstanceException internal constructor(
  * consumer and surfaces as an internal error with the AppAuth exception preserved as cause.
  */
 internal fun AuthorizationException.toIduraVerifyException(): IduraVerifyException =
-  if ((
-      // User closed browser
-      type == AuthorizationException.TYPE_GENERAL_ERROR &&
-        code == AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW.code
-    ) ||
-    (
-      // User explicitly pressed cancel / reject inside the browser
-      type == AuthorizationException.TYPE_OAUTH_AUTHORIZATION_ERROR &&
-        code == AuthorizationException.AuthorizationRequestErrors.ACCESS_DENIED.code
-    )
+  if (type == AuthorizationException.TYPE_GENERAL_ERROR &&
+    code == AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW.code
   ) {
     UserCancelledException(cause = this)
   } else {

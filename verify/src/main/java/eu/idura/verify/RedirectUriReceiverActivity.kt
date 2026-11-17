@@ -1,6 +1,7 @@
 package eu.idura.verify
 
 import android.app.ActivityManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -8,14 +9,14 @@ import androidx.appcompat.app.AppCompatActivity
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.Span
-import net.openid.appauth.AuthorizationManagementActivity
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The task of the activity whose browser flow is in flight, recorded when the browser is launched,
  * along with the span of that launch for the receiver to report on. Process-wide, because that is
  * all the receiver below can reach: it is started by the system, not by the instance that launched
- * the browser.
+ * the browser. For a Custom Tab it also carries the callback URI from the receiver to the
+ * [CustomTabActivity], so the URI lives exactly as long as the flow.
  *
  * Only the latest flow is kept. Flows on two instances at once — on two activities, since one
  * activity hosts one task — would see the earlier one sent to the later one's task.
@@ -24,6 +25,9 @@ internal class BrowserFlowHostTask private constructor(
   val id: Int,
   val span: Span,
 ) {
+  /** Set by the receiver, read by the trampoline. Main thread only. */
+  var callbackUri: Uri? = null
+
   /** Forget this record, unless a later flow has replaced it already. */
   fun release() {
     currentRecord.compareAndSet(this, null)
@@ -42,8 +46,9 @@ internal class BrowserFlowHostTask private constructor(
   }
 }
 
-// This is heavily inspired by the `net.openid.appauth.RedirectUriReceiverActivity` class, but only starts the
-// `AuthorizationManagementActivity` if this is _not_ a DK MitID app switch.
+// Takes the callback URI from the browser, or from the MitID app on an app switch. The browser's is
+// handed to the waiting CustomTabActivity, unless the Auth Tab took the callback itself. An app
+// switch only needs the browser brought back, which carries on with the login.
 class RedirectUriReceiverActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceBundle: Bundle?) {
     super.onCreate(savedInstanceBundle)
@@ -53,39 +58,47 @@ class RedirectUriReceiverActivity : AppCompatActivity() {
         .queryParameterNames
         .contains(APPSWITCH_QUERY_PARAM)
 
-    if (!isAppswitch) {
-      // this is taken from net.openid.appauth.AuthorizationManagementActivity.RedirectUriReceiverActivity
-      startActivity(
-        AuthorizationManagementActivity.createResponseHandlingIntent(
-          this,
-          intent.data,
-        ),
-      )
+    // The browser and the MitID app open the callback URI with FLAG_ACTIVITY_NEW_TASK, which places
+    // us in the task matching our affinity — the package name by default. A host whose task has a
+    // different one (Flutter's template sets an empty `taskAffinity`, for one) does not match, so we
+    // get a task of our own, and finishing would leave the host behind in the background. So we
+    // bring the host's task forward whenever we did not land in it.
+    //
+    // On an app switch the browser is still on top of the host, carrying on with the login, so that
+    // is all there is to do. Otherwise the URI goes to the trampoline, which is restarted in the
+    // host's task, clearing the tab off the top of it.
+    val record = BrowserFlowHostTask.current
+    if (record == null) {
+      Log.w(TAG, "Received a callback with no browser flow in flight")
+      recordCallbackWithNoFlow()
     } else {
-      // The MitID app opens the callback URI with FLAG_ACTIVITY_NEW_TASK, which places us in the task
-      // matching our affinity — the package name by default. A host whose task has a different one
-      // (Flutter's template sets an empty `taskAffinity`, for one) does not match, so we get a task
-      // of our own, and finishing would leave the host behind in the background, with the browser
-      // still on top of it carrying on with the login. So we bring the host's task forward whenever
-      // we did not land in it. The browser's own callback above has the same problem, which this
-      // does not address.
-      findHostTask()?.moveToFront()
+      if (!isAppswitch) {
+        // Before the host's task moves, so a trampoline the move brings back finds the URI.
+        val restarted = CustomTabActivity.deliver(this, record, intent.data!!)
+        if (!restarted) {
+          Log.w(TAG, "Could not restart the CustomTabActivity; it takes the callback once on top")
+          record.span.addEvent(
+            "trampoline not restarted",
+            Attributes.of(
+              AttributeKey.longKey("host_task_id"),
+              record.id.toLong(),
+              AttributeKey.longKey("receiver_task_id"),
+              taskId.toLong(),
+            ),
+          )
+        }
+      }
+      findHostTask(record)?.moveToFront()
     }
     finish()
   }
 
   /**
    * The host's task, if it is not the one we were placed in. `null` when we are already in it, which
-   * is the common case, and also when it cannot be found — then all we can do is carry on as if we
-   * were, and log why the login may not come back.
+   * is the common case, and also when it cannot be found — then all we can do is log why the login
+   * may not come back.
    */
-  private fun findHostTask(): ActivityManager.AppTask? {
-    val record = BrowserFlowHostTask.current
-    if (record == null) {
-      Log.w(TAG, "Received a callback with no browser flow in flight")
-      recordCallbackWithNoFlow()
-      return null
-    }
+  private fun findHostTask(record: BrowserFlowHostTask): ActivityManager.AppTask? {
     val hostTaskId = record.id
     if (hostTaskId == taskId) return null
 
