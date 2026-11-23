@@ -23,21 +23,29 @@ If you prefer a more interactive approach, there is an [example project](https:/
 
 ## Initialization
 
-The SDK needs to be configured with two pieces of information:
-
-- Your Idura domain, as a bare host name such as `this-is-an-example.idura.broker`.
-- Your Idura client ID.
-
 The SDK assumes that:
 
 - You will be using your [Idura domain](https://docs.idura.app/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
 - Your redirect URL will be `https://[YOUR IDURA DOMAIN]/android/callback`.
 
-You should register the callback URL in the [Idura dashboard](https://dashboard.idura.app). To override these values, see the [Customization section](#customization).
+### Configure your application in the Idura dashboard
 
-The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and app switch URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest)
+When a login finishes, the browser opens your redirect URL. Android opens that URL in your app, instead of as a web page, only if the domain publishes a file that lists your app and its signing key ([App Links](https://developer.android.com/training/app-links/about)). Idura publishes this file on your Idura domain, based on what you enter in the dashboard. In the [Idura dashboard](https://dashboard.idura.app/applications), open your application and:
 
-The domain must also be passed when initializing the SDK class. In order to prevent drift between the value stored in your `build.gradle.kts` file and your code, we recommend adding your domain and client ID as build config fields:
+1. Add `https://[YOUR IDURA DOMAIN]/android/callback` as a redirect URL.
+2. In the **Native/Mobile** section, add your Android application ID.
+3. In the same section, add the fingerprint of your app signing key. During development, you can get the fingerprint by running `./gradlew signingReport`. To get the signing key to use for release, see the [Android documentation](https://developer.android.com/training/app-links/configure-assetlinks#declare-website).
+
+### Add your domain and client ID to the gradle configuration
+
+The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and [app switch](https://docs.idura.app/verify/guides/appswitch/) URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest).
+
+The SDK needs to be configured with two pieces of information:
+
+- Your Idura domain, as a bare host name, such as `this-is-an-example.idura.broker`.
+- Your Idura client ID.
+
+In order to prevent drift between the value stored in your `build.gradle.kts` file and your code, we recommend adding your domain and client ID as build config fields:
 
 ```kt
 android {
@@ -60,7 +68,7 @@ android {
 }
 ```
 
-You can then instantiate the SDK like this:
+### Create the SDK instance
 
 ```kt
 val iduraVerify =
@@ -87,11 +95,7 @@ You are not restricted to that, though. The SDK can be constructed at any point 
 
 If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with a `DuplicateInstanceException`.
 
-### A word about redirect URLs
-
-In order for redirect URLs to work, your app needs to prove that it is authorized to capture the URL. This is done by using [App Links](https://developer.android.com/training/app-links/about). When you use your Idura domain, Idura manages this for you, as long as you configure your package name and the fingerprint of your signing key in the Idura dashboard.
-
-During development, you can get the fingerprint of your local signing key by running `./gradlew signingReport`. To get the signing key to use for release, see the [Android documentation](https://developer.android.com/training/app-links/configure-assetlinks#declare-website).
+### Check the app link
 
 When the SDK is initialized, it will verify that your app is configured to capture the app links. If your app is _not_ correctly configured, you will see a warning like so:
 
