@@ -46,7 +46,7 @@ android {
   }
 
   val iduraClientId = "urn:my:application:identifier:XXXX"
-  val iduraDomain = "this-is-an-example.idura.broker
+  val iduraDomain = "this-is-an-example.idura.broker"
 
   defaultConfig {
     manifestPlaceholders["iduraDomain"] = iduraDomain
