@@ -1,5 +1,6 @@
 package eu.idura.verify
 
+import android.net.Uri
 import net.openid.appauth.AuthorizationException
 
 /**
@@ -71,6 +72,26 @@ class OAuthException(
       append(error)
       if (errorDescription != null) append(" ($errorDescription)")
     },
+  )
+
+/**
+ * The browser refused to return the HTTPS redirect to this app because it could not verify,
+ * through Digital Asset Links, that the app owns [redirectUri]. This is a configuration error, not
+ * a runtime condition: `https://<host>/.well-known/assetlinks.json` for the redirect host must
+ * list [packageName] with one of [signingCertificateFingerprints], the SHA-256 fingerprints of the
+ * certificates the installed app is signed with. A debug build, a build signed with the upload key
+ * instead of the Play App Signing key, or a redirect host other than the one serving the file are
+ * the usual causes.
+ */
+class RedirectVerificationFailedException internal constructor(
+  val redirectUri: Uri,
+  val packageName: String,
+  val signingCertificateFingerprints: List<String>,
+) : IduraVerifyException(
+    "Could not verify that $packageName owns the redirect URI $redirectUri. " +
+      "https://${redirectUri.host}/.well-known/assetlinks.json must list $packageName " +
+      "with one of its signing certificate SHA-256 fingerprints: " +
+      signingCertificateFingerprints.joinToString(", "),
   )
 
 /**

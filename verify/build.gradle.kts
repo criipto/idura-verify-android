@@ -47,7 +47,19 @@ android {
     buildConfigField("String", "VERSION", "\"$version\"")
   }
 
+  signingConfigs {
+    getByName("debug") {
+      storeFile = rootProject.file("example/debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
+  }
+
   buildTypes {
+    debug {
+      signingConfig = signingConfigs.getByName("debug")
+    }
     release {
       isMinifyEnabled = false
       proguardFiles(
