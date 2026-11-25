@@ -1,6 +1,6 @@
 # idura-verify-android
 
-The Idura Verify Android SDK allows your users to authenticate with a host of European eID providers. It allows your application to act as a [_public client_](https://docs.idura.app/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.app/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
+The Idura Verify Android SDK allows your users to authenticate with the European eIDs supported by Idura Verify. It allows your application to act as a [_public client_](https://docs.idura.app/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.app/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
 
 In addition to the basic OIDC flow, the SDK also supports [app switching](https://docs.idura.app/verify/guides/appswitch/).
 
@@ -19,7 +19,7 @@ implementation("eu.idura:verify:2.0.1")
 
 # Usage
 
-If you prefer a more interactive approach, there is an [example project](https://github.com/criipto/idura-verify-android/blob/master/example/README.md) which your can run and play around with.
+If you prefer a more interactive approach, there is an [example project](https://github.com/criipto/idura-verify-android/blob/master/example/README.md) which you can run and play around with.
 
 ## Initialization
 
@@ -176,11 +176,11 @@ Programming errors detected during construction (HTTPS-only redirect URI, lifecy
 
 In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards criipto.id / idura.broker, you do not need to do anything else.
 
-If you want to use another domain, you need to host an `assetslinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
+If you want to use another domain, you need to host an `assetlinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
 
 ## Using a custom callback URL
 
-If you want to a different callback URL you need to:
+If you want to use a different callback URL you need to:
 
 1. Pass it when initializing the SDK:
 
