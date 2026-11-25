@@ -459,6 +459,18 @@ class IduraVerify private constructor(
     if (intent.resolveActivity(activity.packageManager) == null) {
       Log.w(TAG, "App link is not correctly configured for $uri")
     }
+
+    val appLinkState = appLinkState(activity, uri.host!!)
+    if (appLinkState != null && !appLinkState.opensInApp) {
+      Log.w(
+        TAG,
+        "Android will not open $uri in ${activity.packageName} (domain state: " +
+          "${appLinkState.hostState}, link handling allowed: " +
+          "${appLinkState.linkHandlingAllowed}). Check that " +
+          "https://${uri.host}/.well-known/assetlinks.json lists this package with one of " +
+          signingCertificateFingerprints(activity).joinToString(", "),
+      )
+    }
   }
 
   override fun onResume(owner: LifecycleOwner) {
