@@ -1,6 +1,6 @@
 # idura-verify-android
 
-The Idura Verify Android SDK allows your users to authenticate with a host of European eID providers. It allows your application to act as a [_public client_](https://docs.idura.app/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.app/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
+The Idura Verify Android SDK allows your users to authenticate with the European eIDs supported by Idura Verify. It allows your application to act as a [_public client_](https://docs.idura.app/verify/getting-started/glossary/#public-clients), meaning it does not use a client secret, but instead employs [PKCE](https://docs.idura.app/verify/getting-started/glossary/#pkce-proof-key-for-code-exchange) to ensure that a malicious actor cannot intercept the authorization code.
 
 In addition to the basic OIDC flow, the SDK also supports [app switching](https://docs.idura.app/verify/guides/appswitch/).
 
@@ -19,25 +19,33 @@ implementation("eu.idura:verify:2.0.1")
 
 # Usage
 
-If you prefer a more interactive approach, there is an [example project](https://github.com/criipto/idura-verify-android/blob/master/example/README.md) which your can run and play around with.
+If you prefer a more interactive approach, there is an [example project](https://github.com/criipto/idura-verify-android/blob/master/example/README.md) which you can run and play around with.
 
 ## Initialization
-
-The SDK needs to be configured with two pieces of information:
-
-- Your Idura domain, as a bare host name such as `this-is-an-example.idura.broker`.
-- Your Idura client ID.
 
 The SDK assumes that:
 
 - You will be using your [Idura domain](https://docs.idura.app/verify/getting-started/glossary/#domain-idura-domain) to host your redirect URL (both custom (vanity) domains, \*.criipto.id, and \*.idura.broker domains can be used).
 - Your redirect URL will be `https://[YOUR IDURA DOMAIN]/android/callback`.
 
-You should register the callback URL in the [Idura dashboard](https://dashboard.idura.app). To override these values, see the [Customization section](#customization).
+### Configure your application in the Idura dashboard
 
-The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and app switch URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest)
+When a login finishes, the browser opens your redirect URL. Android opens that URL in your app, instead of as a web page, only if the domain publishes a file that lists your app and its signing key ([App Links](https://developer.android.com/training/app-links/about)). Idura publishes this file on your Idura domain, based on what you enter in the dashboard. In the [Idura dashboard](https://dashboard.idura.app/applications), open your application and:
 
-The domain must also be passed when initializing the SDK class. In order to prevent drift between the value stored in your `build.gradle.kts` file and your code, we recommend adding your domain and client ID as build config fields:
+1. Add `https://[YOUR IDURA DOMAIN]/android/callback` as a redirect URL.
+2. In the **Native/Mobile** section, add your Android application ID.
+3. In the same section, add the fingerprint of your app signing key. During development, you can get the fingerprint by running `./gradlew signingReport`. To get the signing key to use for release, see the [Android documentation](https://developer.android.com/training/app-links/configure-assetlinks#declare-website).
+
+### Add your domain and client ID to the gradle configuration
+
+The domain needs to be configured at compile time, since it is used to set up [intent filters](https://developer.android.com/guide/components/intents-filters#Receiving) for your redirect and [app switch](https://docs.idura.app/verify/guides/appswitch/) URLs. You do so by using [manifest placeholders](https://developer.android.com/build/manage-manifests#inject_build_variables_into_the_manifest).
+
+The SDK needs to be configured with two pieces of information:
+
+- Your Idura domain, as a bare host name, such as `this-is-an-example.idura.broker`.
+- Your Idura client ID.
+
+In order to prevent drift between the value stored in your `build.gradle.kts` file and your code, we recommend adding your domain and client ID as build config fields:
 
 ```kt
 android {
@@ -46,7 +54,7 @@ android {
   }
 
   val iduraClientId = "urn:my:application:identifier:XXXX"
-  val iduraDomain = "this-is-an-example.idura.broker
+  val iduraDomain = "this-is-an-example.idura.broker"
 
   defaultConfig {
     manifestPlaceholders["iduraDomain"] = iduraDomain
@@ -60,7 +68,7 @@ android {
 }
 ```
 
-You can then instantiate the SDK like this:
+### Create the SDK instance
 
 ```kt
 val iduraVerify =
@@ -87,40 +95,7 @@ You are not restricted to that, though. The SDK can be constructed at any point 
 
 If you create more than one instance against the same activity, give each one a distinct client ID or domain. Two instances sharing both would also share their browser result delivery, so the constructor rejects the second one with a `DuplicateInstanceException`.
 
-### Hosts that are not a `ComponentActivity`
-
-This section is mostly relevant for plugin implementers (Flutter, MAUI etc.) or consumers who do not use AndroidX or Compose. You should only reach for it if you encounter errors about missing lifecycle callbacks, or `onActivityResult` forwarding.
-
-A `ComponentActivity` — which `AppCompatActivity` and `FragmentActivity` both are — needs nothing beyond what is mentioned in the "Initialization" section. The SDK receives the browser result through the activity's own activity result registry. So does any other host that implements `ActivityResultRegistryOwner`.
-
-Activities that do not implement `ActivityResultRegistryOwner` must manually forward an activity result to the SDK:
-
-```kt
-val iduraVerify = IduraVerify(
-  BuildConfig.IDURA_CLIENT_ID,
-  BuildConfig.IDURA_DOMAIN,
-  activity = this,
-)
-
-override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-  if (iduraVerify.handleActivityResult(requestCode, resultCode, data)) {
-    return
-  }
-  super.onActivityResult(requestCode, resultCode, data)
-}
-```
-
-`handleActivityResult` returns whether the result was one the SDK asked for. Forwarding is always safe: against an activity that owns a registry the SDK is already receiving results through it, and the call is a no-op returning `false`.
-
-The SDK follows the activity's lifecycle, so the activity has to implement `LifecycleOwner` — every `ComponentActivity` already does. An activity that does not implement it is rejected with an `IllegalArgumentException`.
-
-That registry has to actually be driven, or the SDK never initializes and `login()` fails with an `IllegalStateException` saying so. [`PlainHostActivity`](https://github.com/criipto/idura-verify-android/blob/master/example/src/main/java/eu/idura/verifyexample/PlainHostActivity.kt) in the example app shows how to manually implement `LifecycleOwner` and how to forward activity results.
-
-### A word about redirect URLs
-
-In order for redirect URLs to work, your app needs to prove that it is authorized to capture the URL. This is done by using [App Links](https://developer.android.com/training/app-links/about). When you use your Idura domain, Idura manages this for you, as long as you configure your package name and the fingerprint of your signing key in the Idura dashboard.
-
-During development, you can get the fingerprint of your local signing key by running `./gradlew signingReport`. To get the signing key to use for release, see the [Android documentation](https://developer.android.com/training/app-links/configure-assetlinks#declare-website).
+### Check the app link
 
 When the SDK is initialized, it will verify that your app is configured to capture the app links. If your app is _not_ correctly configured, you will see a warning like so:
 
@@ -197,15 +172,15 @@ Programming errors detected during construction (HTTPS-only redirect URI, lifecy
 
 # Customization
 
-## Using a custom callback domain
+## Using a custom redirect domain
 
 In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards criipto.id / idura.broker, you do not need to do anything else.
 
-If you want to use another domain, you need to host an `assetslinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
+If you want to use another domain, you need to host an `assetlinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
 
-## Using a custom callback URL
+## Using a custom redirect URL
 
-If you want to a different callback URL you need to:
+If you want to use a different redirect URL you need to:
 
 1. Pass it when initializing the SDK:
 
@@ -241,3 +216,32 @@ IduraVerify(
 </application>
 
 ```
+
+## Hosts that are not a `ComponentActivity`
+
+This section is mostly relevant for plugin implementers (Flutter, MAUI etc.) or consumers who do not use AndroidX or Compose. You should only reach for it if you encounter errors about missing lifecycle callbacks, or `onActivityResult` forwarding.
+
+A `ComponentActivity` — which `AppCompatActivity` and `FragmentActivity` both are — needs nothing beyond what is mentioned in the "Initialization" section. The SDK receives the browser result through the activity's own activity result registry. So does any other host that implements `ActivityResultRegistryOwner`.
+
+Activities that do not implement `ActivityResultRegistryOwner` must manually forward an activity result to the SDK:
+
+```kt
+val iduraVerify = IduraVerify(
+  BuildConfig.IDURA_CLIENT_ID,
+  BuildConfig.IDURA_DOMAIN,
+  activity = this,
+)
+
+override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+  if (iduraVerify.handleActivityResult(requestCode, resultCode, data)) {
+    return
+  }
+  super.onActivityResult(requestCode, resultCode, data)
+}
+```
+
+`handleActivityResult` returns whether the result was one the SDK asked for. Forwarding is always safe: against an activity that owns a registry the SDK is already receiving results through it, and the call is a no-op returning `false`.
+
+The SDK follows the activity's lifecycle, so the activity has to implement `LifecycleOwner` — every `ComponentActivity` already does. An activity that does not implement it is rejected with an `IllegalArgumentException`.
+
+That registry has to actually be driven, or the SDK never initializes and `login()` fails with an `IllegalStateException` saying so. [`PlainHostActivity`](https://github.com/criipto/idura-verify-android/blob/master/example/src/main/java/eu/idura/verifyexample/PlainHostActivity.kt) in the example app shows how to manually implement `LifecycleOwner` and how to forward activity results.
