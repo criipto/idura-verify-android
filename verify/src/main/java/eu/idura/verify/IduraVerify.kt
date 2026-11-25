@@ -26,6 +26,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.forms.submitForm
 import io.ktor.http.parametersOf
 import io.ktor.serialization.kotlinx.json.json
+import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -584,7 +585,13 @@ class IduraVerify private constructor(
       }
 
       AuthTabIntent.RESULT_VERIFICATION_FAILED -> {
-        handleException(IduraVerifyInternalException("Auth Tab verification failed"))
+        handleException(
+          RedirectVerificationFailedException(
+            redirectUri = redirectUri,
+            packageName = activity.packageName,
+            signingCertificateFingerprints = signingCertificateFingerprints(activity),
+          ),
+        )
       }
 
       AuthTabIntent.RESULT_VERIFICATION_TIMED_OUT -> {
@@ -959,7 +966,20 @@ class IduraVerify private constructor(
       .spanBuilder("launch browser")
       .setAttribute("browser", browserDescription ?: "unknown")
       .setAttribute("browser.needs_continue_button", browserNeedsContinueButton)
-      .withSpanContext(span)
+      .setAttribute("android.package_name", activity.packageName)
+      .setAttribute(
+        AttributeKey.stringArrayKey("android.signing_certificate_fingerprints"),
+        signingCertificateFingerprints(activity),
+      ).apply {
+        val appLinkState = appLinkState(activity, redirectUri.host!!)
+        setAttribute(
+          "android.app_links.redirect_host_state",
+          appLinkState?.hostState ?: "unavailable",
+        )
+        appLinkState?.let {
+          setAttribute("android.app_links.link_handling_allowed", it.linkHandlingAllowed)
+        }
+      }.withSpanContext(span)
       .startAndRun { launchSpan ->
         var hostTask: BrowserFlowHostTask? = null
         try {

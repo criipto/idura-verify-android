@@ -165,6 +165,7 @@ import eu.idura.verify.IduraVerifyException
 import eu.idura.verify.LoginAlreadyInProgressException
 import eu.idura.verify.NoSuitableBrowserException
 import eu.idura.verify.OAuthException
+import eu.idura.verify.RedirectVerificationFailedException
 import eu.idura.verify.UserCancelledException
 
 try {
@@ -181,6 +182,10 @@ try {
 } catch (ex: OAuthException) {
   // The IdP returned a non-cancellation OAuth error. `ex.error` is the OAuth 2.0 error code,
   // `ex.errorDescription` is the optional human-readable text.
+} catch (ex: RedirectVerificationFailedException) {
+  // Chrome could not verify through Digital Asset Links that the app owns the redirect URI.
+  // A configuration error: `assetlinks.json` on the redirect host has to list `ex.packageName`
+  // with one of `ex.signingCertificateFingerprints`, e.g. the debug or upload key.
 } catch (ex: IduraVerifyException) {
   // Catch-all for SDK-internal failures (PAR, JWT verification, browser plumbing). Treat
   // as unrecoverable; surface a generic error to the user and log the cause.
