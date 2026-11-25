@@ -172,15 +172,15 @@ Programming errors detected during construction (HTTPS-only redirect URI, lifecy
 
 # Customization
 
-## Using a custom callback domain
+## Using a custom redirect domain
 
 In this context, a _custom_ domain means a domain _not_ hosted by Idura. If you have registered a custom (vanity) domain in the Idura dashboard, and pointed it towards criipto.id / idura.broker, you do not need to do anything else.
 
 If you want to use another domain, you need to host an `assetlinks.json` file on the domain, as described in the [Android documentation](https://developer.android.com/training/app-links/about).
 
-## Using a custom callback URL
+## Using a custom redirect URL
 
-If you want to use a different callback URL you need to:
+If you want to use a different redirect URL you need to:
 
 1. Pass it when initializing the SDK:
 
